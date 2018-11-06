@@ -170,7 +170,11 @@ function getCollection(collectionName, uniqueCol) {
   }
 }
 
+
 function restoreDatabase(callback) {
+  //TODO: originalUrls, blacklist peers, blacklistedItemsForPublicKey, mostRecentMessageTime
+
+
   if (conf.has('db')) {
     db.loadDatabase({}, function() {
       ratings = getCollection('ratings', null);
