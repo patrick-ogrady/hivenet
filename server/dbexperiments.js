@@ -139,6 +139,9 @@ node.on('ready', async () => { //wait to run command line until IPFS initialized
     calculateRecommendations("2");
     console.log("Next Recommendation:", getRecommendation());
     console.log("Next Recommendation:", getRecommendation());
+    console.log("Next Recommendation:", getRecommendation());
+    console.log("Next Recommendation:", getRecommendation());
+    backupDatabase();
   });
 
 
@@ -149,21 +152,38 @@ node.on('ready', async () => { //wait to run command line until IPFS initialized
 let ratings;
 let whitelist;
 let blacklist;
+let recommendations;
+
+function getCollection(collectionName, uniqueCol) {
+  var toReturn = db.getCollection(collectionName);
+  if (!toReturn) {
+    console.log("Must Create", collectionName, uniqueCol);
+    if (uniqueCol) {
+      return db.addCollection(collectionName, {
+        unique:[uniqueCol]
+      });
+    } else {
+      return db.addCollection(collectionName);
+    }
+  } else {
+    return toReturn;
+  }
+}
 
 function restoreDatabase(callback) {
   if (conf.has('db')) {
     db.loadDatabase({}, function() {
-      ratings = db.getCollection('ratings');
-      whitelist = db.getCollection('whitelist');
-      blacklist = db.getCollection('blacklist');
+      ratings = getCollection('ratings', null);
+      whitelist = getCollection('whitelist', 'address');
+      blacklist = getCollection('blacklist', null);
+      recommendations = getCollection('recommendations', 'address');
       callback(true);
     });
   } else {
-    ratings = db.addCollection('ratings');
-    whitelist = db.addCollection('whitelist', {
-      unique:['address']
-    });
-    blacklist = db.addCollection('blacklist');
+    ratings = getCollection('ratings', null);
+    whitelist = getCollection('whitelist', 'address');
+    blacklist = getCollection('blacklist', null);
+    recommendations = getCollection('recommendations', 'address');
     callback(false);
   }
 }
@@ -230,9 +250,8 @@ function getRatingsForHostnames(hostnames) {
   return ratings.find({ 'hostname' : { '$in' : hostnames } })
 }
 
-var recommendationStorage = [];
-
 function calculateRecommendations(publicKey) {
+  recommendations.chain().remove()
   var allUniqueHostnames = getUniqueWhitelistHostnames();
 
   var applicableRatings = getRatingsForHostnames(allUniqueHostnames);
@@ -252,18 +271,20 @@ function calculateRecommendations(publicKey) {
   for (var j = 0; j < predicted_table.rowNames.length; ++j) {
     var url_string = predicted_table.rowNames[j];
     if (table.containsCell(url_string, publicKey) == false) {
-      urls_to_view.push([url_string, predicted_table.getCell(url_string, publicKey)]);
+      recommendations.insert({
+        address:url_string,
+        score:predicted_table.getCell(url_string, publicKey)
+      });
     }
   }
-
-  return recommendationStorage = urls_to_view.sort(function(a,b) {
-    return a[1] < b[1] ? 1:0;
-  });
 }
 
 function getRecommendation() {
-  if (recommendationStorage.length > 0) {
-    return recommendationStorage.shift();
+  var resultSet = recommendations.chain().simplesort('score').limit(1);
+  var resultSetData = resultSet.data();
+  if (resultSetData.length > 0) {
+    resultSet.remove()
+    return resultSetData[0];
   } else {
     return null;
   }
