@@ -10,6 +10,7 @@
   "license": "MIT",
   "dependencies": {
     "body-parser": "^1.18.3",
+    "chainpoint-client": "^0.2.4",
     "configstore": "^4.0.0",
     "crypto2": "^2.0.0",
     "cryptr": "^4.0.0",
