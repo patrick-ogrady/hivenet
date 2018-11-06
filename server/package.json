@@ -19,6 +19,7 @@
     "ipfs": "^0.32.3",
     "keytar": "^4.3.0",
     "libp2p-crypto": "^0.14.0",
+    "lokijs": "^1.5.5",
     "opn": "^5.4.0",
     "random-key": "^0.3.2",
     "randomstring": "^1.1.5"
