@@ -136,6 +136,8 @@ function getRatingsForHostnames(hostnames) {
   return ratings.find({ 'hostname' : { '$in' : hostnames } })
 }
 
+var recommendationStorage = [];
+
 function calculateRecommendations(publicKey) {
   var allUniqueHostnames = getUniqueWhitelistHostnames();
 
@@ -160,9 +162,20 @@ function calculateRecommendations(publicKey) {
     }
   }
 
-  return urls_to_view.sort(function(a,b) {
+  return recommendationStorage = urls_to_view.sort(function(a,b) {
     return a[1] < b[1] ? 1:0;
   });
 }
 
-console.log(calculateRecommendations("2"));
+function getRecommendation() {
+  if (recommendationStorage.length > 0) {
+    return recommendationStorage.shift();
+  } else {
+    return null;
+  }
+}
+
+calculateRecommendations("2");
+
+console.log("Next Recommendation:", getRecommendation());
+console.log("Next Recommendation:", getRecommendation());
