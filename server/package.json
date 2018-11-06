@@ -1,0 +1,28 @@
+{
+  "name": "hivenet",
+  "version": "0.0.1",
+  "description": "an autonomous recommendation system",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Patrick O'Grady <prohb125@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "body-parser": "^1.18.3",
+    "configstore": "^4.0.0",
+    "crypto2": "^2.0.0",
+    "cryptr": "^4.0.0",
+    "express": "^4.16.4",
+    "figlet": "^1.2.1",
+    "ipfs": "^0.32.3",
+    "keytar": "^4.3.0",
+    "libp2p-crypto": "^0.14.0",
+    "opn": "^5.4.0",
+    "random-key": "^0.3.2",
+    "randomstring": "^1.1.5"
+  },
+  "bin": {
+    "hivenet": "./index.js"
+  }
+}
