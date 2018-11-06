@@ -109,10 +109,11 @@ async function createMessage() {
   const messageProof = await storeHashInChainpoint(signedPayloadHash);
   console.log("signed hash proof:", messageProof, "\n");
 
-  const messageToSend = JSON.stringify({proof:messageProof, message:{signature:signature, payload:payload}});
-  console.log("message to send:", messageToSend);
+  const messageToSend = JSON.stringify({proof:messageProof, message:{signature:signature, publicKey:publicKey, payload:payload}});
+  console.log("message to send:", messageToSend, "\n");
 
   const valid_message = await checkMessage(messageToSend);
+  console.log("Valid Message:", valid_message);
 }
 
 
@@ -123,6 +124,18 @@ async function checkMessage(recievedMessage) {
     const creationTime = await verifyProofInChainpoint(parsedMessage["proof"]);
     const timeSinceCreation = (new Date() - new Date(creationTime))/1000;
     console.log("Time Since Creation(s):", timeSinceCreation);
+
+    if ("message" in parsedMessage) {
+      if ("signature" in parsedMessage["message"] && "publicKey" in parsedMessage["message"] && "payload" in parsedMessage["message"]) {
+        const isSignatureValid = await crypto2.verify.sha256(parsedMessage["message"]["payload"], parsedMessage["message"]["publicKey"], parsedMessage["message"]["signature"]);
+        return true;
+      } else {
+        return false;
+      }
+    } else {
+      return false;
+    }
+
   } else {
     return false;
   }
