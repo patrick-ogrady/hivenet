@@ -107,16 +107,17 @@ const node = new IPFS({
 });
 
 node.on('ready', async () => { //wait to run command line until IPFS initialized
+  conf.delete('db');
   restoreDatabase(function(success) {
     if (success == false) {
       console.log("PREVIOUS DB SAVE NOT PRESENT");
-      addRatingToDB("1", "url1", "hostname1", 1)
-      addRatingToDB("1", "url2", "hostname1", 1)
-      addRatingToDB("1", "url3", "hostname2", 1)
-      addRatingToDB("1", "url4", "hostname3", 1)
-      addRatingToDB("2", "url2", "hostname1", 1)
-      addRatingToDB("2", "url5", "hostname2", 1)
-      addRatingToDB("2", "url3", "hostname2", 0)
+      addRatingToDB("1", "url1", "hostname1", 1, "2018-11-06T00:53:40Z")
+      addRatingToDB("1", "url2", "hostname1", 1, "2018-11-06T00:53:40Z")
+      addRatingToDB("1", "url3", "hostname2", 1, "2018-11-06T00:53:40Z")
+      addRatingToDB("1", "url4", "hostname3", 1, "2018-11-06T00:53:40Z")
+      addRatingToDB("2", "url2", "hostname1", 1, "2018-11-05T00:53:40Z")
+      addRatingToDB("2", "url5", "hostname2", 1, "2018-11-07T00:53:40Z")
+      addRatingToDB("2", "url3", "hostname2", 0, "2018-11-07T00:53:40Z")
       console.log(ratings.data);
 
       // deleteForHostname("hostname1");
@@ -131,7 +132,7 @@ node.on('ready', async () => { //wait to run command line until IPFS initialized
       addWhitelist("address1", "hostname1");
       addWhitelist("address3", "hostname2");
 
-      backupDatabase();
+      // backupDatabase();
     } else {
       console.log("PREVIOUS DB SAVE PRESENT");
     }
@@ -141,11 +142,13 @@ node.on('ready', async () => { //wait to run command line until IPFS initialized
     console.log("Next Recommendation:", getRecommendation());
     console.log("Next Recommendation:", getRecommendation());
     console.log("Next Recommendation:", getRecommendation());
-    backupDatabase();
+    // backupDatabase();
+
+    console.log("oldest:", "url2", getOldestSeen("url2"));
+    console.log("oldest:", "url6", getOldestSeen("url6"));
+
+    getUserCountOldestRatedAddresses("1");
   });
-
-
-
 
 });
 
@@ -203,12 +206,13 @@ function backupDatabase() {
 
 
 
-function addRatingToDB(publicKey, address, hostname, rating) {
+function addRatingToDB(publicKey, address, hostname, rating, proofTimestamp) {
   ratings.insert({
     publicKey:publicKey,
     address:address,
     hostname:hostname,
-    rating:rating
+    rating:rating,
+    proofTimestamp:proofTimestamp
   });
 }
 
@@ -291,5 +295,23 @@ function getRecommendation() {
     return resultSetData[0];
   } else {
     return null;
+  }
+}
+
+function getOldestSeen(address) {
+  var resultSetData = ratings.chain().find({'address':address}).simplesort('proofTimestamp').limit(1).data();
+  if (resultSetData.length > 0) {
+    return resultSetData[0];
+  } else {
+    return null;
+  }
+}
+
+function getUserCountOldestRatedAddresses(publicKey) {
+  //get oldest ratings for all ratings = 1 by self
+  var allPublicKeyRatings = ratings.chain().find({'publicKey':publicKey}).data();
+  for (rating in allPublicKeyRatings) {
+    var oldestSeenRating = getOldestSeen(allPublicKeyRatings[rating].address);
+    console.log(oldestSeenRating.publicKey, oldestSeenRating.address, oldestSeenRating.proofTimestamp);
   }
 }
