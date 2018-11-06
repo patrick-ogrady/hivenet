@@ -3,6 +3,9 @@ const Configstore = require('configstore');
 const pkg = require('./package.json');
 const conf = new Configstore(pkg.name);
 
+const jsrecommender = require("./jsrecommender");
+var recommender = new jsrecommender.Recommender();
+
 var db = new loki('sandbox', {
   adapter: {
     mode:"reference",
@@ -77,28 +80,25 @@ addRatingToDB("1", "url1", "hostname1", 1)
 addRatingToDB("1", "url2", "hostname1", 1)
 addRatingToDB("1", "url3", "hostname2", 1)
 addRatingToDB("1", "url4", "hostname3", 1)
+addRatingToDB("2", "url2", "hostname1", 1)
 addRatingToDB("2", "url5", "hostname2", 1)
+addRatingToDB("2", "url3", "hostname2", 0)
 console.log(ratings.data);
 
-function getRatingsForHostnames(hostnames) {
-  console.log("limited hostnames:",ratings.find({ 'hostname' : { '$in' : hostnames } }))
-}
-
-getRatingsForHostnames(["hostname1", "hostname2"]);
 
 function deleteForHostname(hostname) {
   ratings.chain().find({ 'hostname': hostname }).remove();
 }
 
-deleteForHostname("hostname1");
+// deleteForHostname("hostname1");
 
-console.log("Post-delete:", ratings.data);
+// console.log("Post-delete:", ratings.data);
 
 function deleteForPublicKey(publicKey) {
   ratings.chain().find({ 'publicKey': publicKey }).remove();
 }
 
-deleteForPublicKey("2")
+// deleteForPublicKey("2")
 
 console.log("Post-delete:", ratings.data);
 
@@ -125,11 +125,44 @@ function getUniqueWhitelistHostnames() {
       }
       return ret;
   });
-  console.log(result);
+  return result;
 }
 
 addWhitelist("address1", "hostname1");
 addWhitelist("address1", "hostname1");
 addWhitelist("address3", "hostname2");
 
-getUniqueWhitelistHostnames();
+function getRatingsForHostnames(hostnames) {
+  return ratings.find({ 'hostname' : { '$in' : hostnames } })
+}
+
+function calculateRecommendations(publicKey) {
+  var allUniqueHostnames = getUniqueWhitelistHostnames();
+
+  var applicableRatings = getRatingsForHostnames(allUniqueHostnames);
+
+  table = new jsrecommender.Table();
+
+  for (rating in applicableRatings) {
+    var thisRating = applicableRatings[rating];
+    table.setCell(thisRating.address, thisRating.publicKey, thisRating.rating);
+  }
+
+  var model = recommender.fit(table);
+
+  var predicted_table = recommender.transform(table);
+  var urls_to_view = [];
+
+  for (var j = 0; j < predicted_table.rowNames.length; ++j) {
+    var url_string = predicted_table.rowNames[j];
+    if (table.containsCell(url_string, publicKey) == false) {
+      urls_to_view.push([url_string, predicted_table.getCell(url_string, publicKey)]);
+    }
+  }
+
+  return urls_to_view.sort(function(a,b) {
+    return a[1] < b[1] ? 1:0;
+  });
+}
+
+console.log(calculateRecommendations("2"));
