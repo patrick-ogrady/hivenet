@@ -6,66 +6,178 @@ const conf = new Configstore(pkg.name);
 const jsrecommender = require("./jsrecommender");
 var recommender = new jsrecommender.Recommender();
 
+const IPFS = require('ipfs');
+const cryptr = require('cryptr');
+
+const crypto2 = require('crypto2');
+
+async function getKeys() {
+  if (conf.has('publicKey') == false) {
+    console.log("CREATING KEY PAIRS");
+    const { privateKey, publicKey } = await crypto2.createKeyPair();
+    conf.set('publicKey', publicKey);
+    conf.set('privateKey', privateKey);
+    console.log("Public Key:", publicKey, "\n");
+  } else {
+    console.log("KEY PAIRS ALREADY EXIST");
+  }
+
+  return {publicKey:conf.get('publicKey'), privateKey:conf.get('privateKey')};
+}
+
+async function encryptAndStoreString(input_string, callback) {
+  const {publicKey, privateKey} = await getKeys();
+  const encrypter = new cryptr(privateKey);
+  const encryptedString = encrypter.encrypt(input_string);
+  const filesAdded = node.files.add({
+    content: Buffer.from(encryptedString)
+  }, function(err, res) {
+    if (err) {
+      callback(err, "");
+    } else {
+      callback("", res[0].hash);
+    }
+
+  })
+}
+
+async function getAndDecryptString(ipfs_address, callback) {
+  try {
+    const {publicKey, privateKey} = await getKeys();
+    const encrypter = new cryptr(privateKey);
+    node.pin.add(ipfs_address, function(err) {
+      if (err) {
+        callback(err, "");
+      } else {
+        node.files.cat(ipfs_address, function(err, file) {
+          if (err) {
+            callback(err, "");
+          } else {
+            const decrypted_file = encrypter.decrypt(file.toString());
+            callback("", decrypted_file);
+          }
+        });
+      }
+    });
+  } catch (err) {
+    callback(err, "");
+  }
+}
+
+
 var db = new loki('sandbox', {
   adapter: {
     mode:"reference",
-    saveDatabase: function(dbname, dbstring, callback) {
-      // store the database, for this example to localstorage
-      console.log(dbstring);
-      conf.set('db', dbstring);
+    saveDatabase: async function(dbname, dbstring, callback) {
+      encryptAndStoreString(dbstring, function(error, ipfs_address) {
+        if (error) {
+          callback(new Error("An error was encountered loading database."));
+        } else {
+          console.log("BACKUP IPFS ADDRESS:", ipfs_address);
+          conf.set('db', ipfs_address);
+          callback(null);
+        }
 
-      var success = true;  // make your own determinations
-      if (success) {
-        callback(null);
-      }
-      else {
-        callback(new Error("An error was encountered loading " + dbname + " database."));
-      }
+      });
     },
-    loadDatabase: function(dbname, callback) {
-      // using dbname, load the database from wherever your adapter expects it
-
-
-      var success = true; // make your own determinations
-
-      if (success) {
-        callback(conf.get('db'));
-      }
-      else {
-        callback(new Error("There was a problem loading the database"));
-      }
+    loadDatabase: async function(dbname, callback) {
+      // TODO: LOAD AND DECRYPT FROM IPFS
+      getAndDecryptString(conf.get('db'), function(error, decryptedFile) {
+        if (error) {
+          callback(new Error("There was a problem loading the database"));
+        } else {
+          callback(decryptedFile);
+        }
+      });
     }
   }
 });
 
-var ratings = db.addCollection('ratings');
-var whitelist = db.addCollection('whitelist', {
-  unique:['address']
+console.log("Loading IPFS Node....")
+const node = new IPFS({
+  EXPERIMENTAL:{ pubsub: true},
+  relay:{enabled:true, hop:{enabled:true}},
+  config: {
+    Addresses: {
+      Swarm: [
+        "/dns4/ws-star.discovery.libp2p.io/tcp/443/wss/p2p-websocket-star"
+      ]
+    }
+  }
 });
-var blacklist = db.addCollection('blacklist');
+
+node.on('ready', async () => { //wait to run command line until IPFS initialized
+  restoreDatabase(function(success) {
+    if (success == false) {
+      console.log("PREVIOUS DB SAVE NOT PRESENT");
+      addRatingToDB("1", "url1", "hostname1", 1)
+      addRatingToDB("1", "url2", "hostname1", 1)
+      addRatingToDB("1", "url3", "hostname2", 1)
+      addRatingToDB("1", "url4", "hostname3", 1)
+      addRatingToDB("2", "url2", "hostname1", 1)
+      addRatingToDB("2", "url5", "hostname2", 1)
+      addRatingToDB("2", "url3", "hostname2", 0)
+      console.log(ratings.data);
+
+      // deleteForHostname("hostname1");
+
+      // console.log("Post-delete:", ratings.data);
+
+      // deleteForPublicKey("2");
+
+      //console.log("Post-delete:", ratings.data);
+
+      addWhitelist("address1", "hostname1");
+      addWhitelist("address1", "hostname1");
+      addWhitelist("address3", "hostname2");
+
+      backupDatabase();
+    } else {
+      console.log("PREVIOUS DB SAVE PRESENT");
+    }
+
+    calculateRecommendations("2");
+    console.log("Next Recommendation:", getRecommendation());
+    console.log("Next Recommendation:", getRecommendation());
+  });
 
 
 
-//
-// if (conf.has('db')) {
-//   console.log("DB EXISTS");
-//   db.loadDatabase();
-//   var items = db.addCollection('items');
-//   console.log(items.data);
-// } else {
-//   console.log("DB DOES NOT EXIST");
-//   // Add a collection to the database
-//   var items = db.addCollection('items');
-//
-//   // Add some documents to the collection
-//   items.insert({ name : 'mjolnir', owner: 'thor', maker: 'dwarves' });
-//   items.insert({ name : 'gungnir', owner: 'odin', maker: 'elves' });
-//   items.insert({ name : 'tyrfing', owner: 'Svafrlami', maker: 'dwarves' });
-//   items.insert({ name : 'draupnir', owner: 'odin', maker: 'elves' });
-//   items.chain().find({ 'owner': 'odin' }).remove();
-//   console.log(items.data);
-//   db.saveDatabase();
-// }
+
+});
+
+let ratings;
+let whitelist;
+let blacklist;
+
+function restoreDatabase(callback) {
+  if (conf.has('db')) {
+    db.loadDatabase({}, function() {
+      ratings = db.getCollection('ratings');
+      whitelist = db.getCollection('whitelist');
+      blacklist = db.getCollection('blacklist');
+      callback(true);
+    });
+  } else {
+    ratings = db.addCollection('ratings');
+    whitelist = db.addCollection('whitelist', {
+      unique:['address']
+    });
+    blacklist = db.addCollection('blacklist');
+    callback(false);
+  }
+}
+
+
+function backupDatabase() {
+  if (conf.has('db')) {
+    console.log("Old IPFS:", conf.get('db'));
+  }
+  db.saveDatabase();
+  console.log("New IPFS:", conf.get('db'));
+}
+
+
 
 function addRatingToDB(publicKey, address, hostname, rating) {
   ratings.insert({
@@ -76,31 +188,15 @@ function addRatingToDB(publicKey, address, hostname, rating) {
   });
 }
 
-addRatingToDB("1", "url1", "hostname1", 1)
-addRatingToDB("1", "url2", "hostname1", 1)
-addRatingToDB("1", "url3", "hostname2", 1)
-addRatingToDB("1", "url4", "hostname3", 1)
-addRatingToDB("2", "url2", "hostname1", 1)
-addRatingToDB("2", "url5", "hostname2", 1)
-addRatingToDB("2", "url3", "hostname2", 0)
-console.log(ratings.data);
-
-
 function deleteForHostname(hostname) {
   ratings.chain().find({ 'hostname': hostname }).remove();
 }
 
-// deleteForHostname("hostname1");
-
-// console.log("Post-delete:", ratings.data);
 
 function deleteForPublicKey(publicKey) {
   ratings.chain().find({ 'publicKey': publicKey }).remove();
 }
 
-// deleteForPublicKey("2")
-
-console.log("Post-delete:", ratings.data);
 
 function addWhitelist(address, hostname) { //added unique specifier
   try {
@@ -128,9 +224,7 @@ function getUniqueWhitelistHostnames() {
   return result;
 }
 
-addWhitelist("address1", "hostname1");
-addWhitelist("address1", "hostname1");
-addWhitelist("address3", "hostname2");
+
 
 function getRatingsForHostnames(hostnames) {
   return ratings.find({ 'hostname' : { '$in' : hostnames } })
@@ -174,8 +268,3 @@ function getRecommendation() {
     return null;
   }
 }
-
-calculateRecommendations("2");
-
-console.log("Next Recommendation:", getRecommendation());
-console.log("Next Recommendation:", getRecommendation());

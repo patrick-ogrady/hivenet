@@ -3,7 +3,7 @@ var recommender = new jsrecommender.Recommender();
 
 const IPFS = require('ipfs');
 const cryptr = require('cryptr');
-const randomkey = require('random-key');
+const loki = require('lokijs');
 
 const crypto2 = require('crypto2');
 
@@ -470,6 +470,8 @@ app.post('/getScore', function (req, res) {
 // });
 
 
+
+
 //INIT CODE
 figlet('HIVENET', function(err, data) {
     if (err) {
@@ -481,10 +483,12 @@ figlet('HIVENET', function(err, data) {
     initNet();
 });
 
+let node;
+
 async function initNet() {
   //EXPRESS SERVER
   console.log("Loading IPFS Node....")
-  const node = new IPFS({
+  node = new IPFS({
     EXPERIMENTAL:{ pubsub: true},
     relay:{enabled:true, hop:{enabled:true}},
     config: {
@@ -495,7 +499,6 @@ async function initNet() {
       }
     }
   });
-
   node.on('ready', async () => { //wait to run command line until IPFS initialized
     app.listen(3000);
     console.log("hivenet API now listening on Port 3000");
