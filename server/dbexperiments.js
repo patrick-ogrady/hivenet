@@ -121,6 +121,7 @@ node.on('ready', async () => { //wait to run command line until IPFS initialized
       addRatingToDB("2", "url3", "hostname2", 0, "2018-11-07T00:53:40Z")
       addRatingToDB("3", "url9", "hostname9", 1, "2018-11-05T00:53:40Z")
       addRatingToDB("3", "url1", "hostname1", 1, "2018-11-05T00:53:40Z")
+      addRatingToDB("4", "url8", "hostname10", 1, "2018-11-05T00:53:40Z")
       console.log(ratings.data);
 
       // deleteForHostname("hostname1");
@@ -171,6 +172,11 @@ node.on('ready', async () => { //wait to run command line until IPFS initialized
       var handle3 = handleNewMessage("2", (new Date()).toISOString());
       var handle4 = handleNewMessage("2", (new Date()).toISOString());
       console.log("Message Handling Results:", handle1, handle2, handle3, handle4);
+
+
+      //test blacklist peers
+      addBlacklist("1", "hostname10", "2018-11-07T00:53:40Z");
+      handleNewMessage("4", (new Date()).toISOString());
     })
 
   });
@@ -218,6 +224,7 @@ function restoreDatabase(callback) {
       blacklist = getCollection('blacklist', null);
       recommendations = getCollection('recommendations', 'address');
       messages = getCollection('messages', 'publicKey');
+      blacklistPeers = getCollection('blacklistPeers', 'publicKey');
       callback(true);
     });
   } else {
@@ -226,6 +233,7 @@ function restoreDatabase(callback) {
     blacklist = getCollection('blacklist', null);
     recommendations = getCollection('recommendations', 'address');
     messages = getCollection('messages', 'publicKey');
+    blacklistPeers = getCollection('blacklistPeers', 'publicKey');
     callback(false);
   }
 }
@@ -271,6 +279,16 @@ function addWhitelist(address, hostname) { //added unique specifier
     });
   } catch (error) {
     console.log("Can't add to whitelist!", error);
+  }
+}
+
+function addBlacklistPeer(publicKey) { //added unique specifier
+  try {
+    blacklistPeers.insert({
+      publicKey:publicKey
+    });
+  } catch (error) {
+    console.log("Can't add to blacklistPeers!", error);
   }
 }
 
@@ -366,24 +384,38 @@ function getUserCountOldestRatedAddresses(publicKey) {
 
 async function addBlacklist(publicKey, hostname, proofTimestamp) {
   //TODO: Need to consider the case where person adding to blacklist is self...need to also blacklistPeers and remove
-  if (publicKey == "1") {
+  if (publicKey == "1") { //when user doing to self
     //remove hostname from whitelist
+    var whitelistSet = whitelist.chain().find({'hostname':hostname});
+    console.log("Illegal Whitelist Found:", whitelistSet.data().length);
+    whitelistSet.remove();
 
     //remove hostname from ratings
+    var resultSet = ratings.chain().find({'hostname':hostname});
 
     //get all nodes with hostname rated as 1 -> put on blacklistPeers
+    var allIllegalRatings = resultSet.data();
+    console.log("Illegal Ratings Found:", allIllegalRatings.length);
+    for (result in allIllegalRatings) {
+      if (allIllegalRatings[result].rating == 1) {
+        console.log("Adding blacklist peer:", allIllegalRatings[result].publicKey);
+        addBlacklistPeer(allIllegalRatings[result].publicKey);
+      }
+    }
+
+    resultSet.remove();
 
     //remove all messages from hostname from messages to chirp
-
     console.log("NOT CONFIGURED YET");
 
-  } else {
-    blacklist.insert({
-      hostname:hostname,
-      publicKey:publicKey,
-      proofTimestamp:proofTimestamp
-    });
   }
+
+  blacklist.insert({
+    hostname:hostname,
+    publicKey:publicKey,
+    proofTimestamp:proofTimestamp
+  });
+
 
 }
 
@@ -404,6 +436,12 @@ function getNewAddressRisk(publicKey, hostname) { //returns risk out of 1
 }
 
 function handleNewMessage(publicKey, proofTimestamp) {
+  //todo check if a blacklist peer
+  var blacklistPeerResults = blacklistPeers.chain().find({'publicKey':publicKey}).limit(1).data();
+  if (blacklistPeerResults.length > 0) {
+    console.log("Drop message because blacklist peer", blacklistPeerResults);
+    return false;
+  }
   var results = messages.chain().find({'publicKey':publicKey}).limit(1).data();
   var currentDate = new Date();
   if (results.length > 0) {
