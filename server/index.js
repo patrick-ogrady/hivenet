@@ -12,6 +12,7 @@ const Configstore = require('configstore');
 const pkg = require('./package.json');
 const conf = new Configstore(pkg.name);
 
+
 //BASIC INIT
 figlet('HIVENET', function(err, data) {
     if (err) {
@@ -20,7 +21,7 @@ figlet('HIVENET', function(err, data) {
         return;
     }
     console.log(data);
-    startUp();
+    createMessage();
 });
 
 const chp = require('chainpoint-client')
@@ -62,8 +63,20 @@ async function storeHashInChainpoint(hashToStore) {
 
 }
 
+async function verifyProofInChainpoint(proof) {
+  let verifiedProofs = await chp.verifyProofs([proof])
+  console.log("Verified Proof Objects: Expand objects below to inspect.")
+  console.log(verifiedProofs)
 
-async function startUp() {
+  if (verifiedProofs.length > 0) {
+    return verifiedProofs[0]["hashSubmittedCoreAt"];
+  } else {
+    return null;
+  }
+}
+
+
+async function createMessage() {
 
   if (conf.has('publicKey') == false) {
     console.log("CREATING KEY PAIRS");
@@ -98,4 +111,20 @@ async function startUp() {
 
   const messageToSend = JSON.stringify({proof:messageProof, message:{signature:signature, payload:payload}});
   console.log("message to send:", messageToSend);
+
+  const valid_message = await checkMessage(messageToSend);
+}
+
+
+async function checkMessage(recievedMessage) {
+  const parsedMessage = JSON.parse(recievedMessage);
+
+  if ("proof" in parsedMessage) {
+    const creationTime = await verifyProofInChainpoint(parsedMessage["proof"]);
+    const timeSinceCreation = (new Date() - new Date(creationTime))/1000;
+    console.log("Time Since Creation(s):", timeSinceCreation);
+  } else {
+    return false;
+  }
+
 }
