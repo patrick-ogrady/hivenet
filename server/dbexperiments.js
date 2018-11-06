@@ -108,7 +108,7 @@ const node = new IPFS({
 
 node.on('ready', async () => { //wait to run command line until IPFS initialized
   conf.delete('db');
-  restoreDatabase(function(success) {
+  restoreDatabase(async function(success) {
     if (success == false) {
       console.log("PREVIOUS DB SAVE NOT PRESENT");
       addRatingToDB("1", "url1", "hostname1", 1, "2018-11-06T00:53:40Z")
@@ -153,6 +153,7 @@ node.on('ready', async () => { //wait to run command line until IPFS initialized
     userCounts = getUserCountOldestRatedAddresses("1");
     console.log("userCounts:", userCounts);
 
+    addBlacklist("1", "hostname8", "2018-11-07T00:53:40Z");
     addBlacklist("2", "hostname8", "2018-11-07T00:53:40Z");
     addBlacklist("3", "hostname8", "2018-11-07T00:54:40Z");
     console.log("Site Risk:", "hostname8", getNewAddressRisk("1", "hostname8"));
@@ -185,6 +186,9 @@ let whitelist;
 let blacklist;
 let recommendations;
 let messages;
+
+//TODO
+let blacklistPeers;
 
 function getCollection(collectionName, uniqueCol) {
   var toReturn = db.getCollection(collectionName);
@@ -238,6 +242,8 @@ function backupDatabase() {
 
 
 function addRatingToDB(publicKey, address, hostname, rating, proofTimestamp) {
+  //TODO CHECK IF IN BLACKLIST
+
   ratings.insert({
     publicKey:publicKey,
     address:address,
@@ -358,14 +364,27 @@ function getUserCountOldestRatedAddresses(publicKey) {
   return allCount;
 }
 
-function addBlacklist(publicKey, hostname, proofTimestamp) {
+async function addBlacklist(publicKey, hostname, proofTimestamp) {
   //TODO: Need to consider the case where person adding to blacklist is self...need to also blacklistPeers and remove
+  if (publicKey == "1") {
+    //remove hostname from whitelist
 
-  blacklist.insert({
-    hostname:hostname,
-    publicKey:publicKey,
-    proofTimestamp:proofTimestamp
-  });
+    //remove hostname from ratings
+
+    //get all nodes with hostname rated as 1 -> put on blacklistPeers
+
+    //remove all messages from hostname from messages to chirp
+
+    console.log("NOT CONFIGURED YET");
+
+  } else {
+    blacklist.insert({
+      hostname:hostname,
+      publicKey:publicKey,
+      proofTimestamp:proofTimestamp
+    });
+  }
+
 }
 
 function getNewAddressRisk(publicKey, hostname) { //returns risk out of 1
