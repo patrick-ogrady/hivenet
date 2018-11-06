@@ -115,9 +115,12 @@ node.on('ready', async () => { //wait to run command line until IPFS initialized
       addRatingToDB("1", "url2", "hostname1", 1, "2018-11-06T00:53:40Z")
       addRatingToDB("1", "url3", "hostname2", 1, "2018-11-06T00:53:40Z")
       addRatingToDB("1", "url4", "hostname3", 1, "2018-11-06T00:53:40Z")
+      addRatingToDB("1", "url9", "hostname9", 1, "2018-11-06T00:53:40Z")
       addRatingToDB("2", "url2", "hostname1", 1, "2018-11-05T00:53:40Z")
       addRatingToDB("2", "url5", "hostname2", 1, "2018-11-07T00:53:40Z")
       addRatingToDB("2", "url3", "hostname2", 0, "2018-11-07T00:53:40Z")
+      addRatingToDB("3", "url9", "hostname9", 1, "2018-11-05T00:53:40Z")
+      addRatingToDB("3", "url1", "hostname1", 1, "2018-11-05T00:53:40Z")
       console.log(ratings.data);
 
       // deleteForHostname("hostname1");
@@ -147,15 +150,41 @@ node.on('ready', async () => { //wait to run command line until IPFS initialized
     console.log("oldest:", "url2", getOldestSeen("url2"));
     console.log("oldest:", "url6", getOldestSeen("url6"));
 
-    getUserCountOldestRatedAddresses("1");
+    userCounts = getUserCountOldestRatedAddresses("1");
+    console.log("userCounts:", userCounts);
+
+    addBlacklist("2", "hostname8", "2018-11-07T00:53:40Z");
+    addBlacklist("3", "hostname8", "2018-11-07T00:54:40Z");
+    console.log("Site Risk:", "hostname8", getNewAddressRisk("1", "hostname8"));
+
+    addBlacklist("3", "hostname10", "2018-11-07T00:53:40Z");
+
+    console.log("Site Risk:", "hostname10", getNewAddressRisk("1", "hostname10"));
+
+
+    var handle1 = handleNewMessage("2", (new Date()).toISOString());
+    var handle2 = handleNewMessage("2", (new Date()).toISOString());
+    console.log("SLEEPING...");
+    sleep(30).then(() => {
+      //do stuff
+      var handle3 = handleNewMessage("2", (new Date()).toISOString());
+      var handle4 = handleNewMessage("2", (new Date()).toISOString());
+      console.log("Message Handling Results:", handle1, handle2, handle3, handle4);
+    })
+
   });
 
 });
+
+const sleep = (seconds) => {
+  return new Promise(resolve => setTimeout(resolve, seconds * 1000))
+}
 
 let ratings;
 let whitelist;
 let blacklist;
 let recommendations;
+let messages;
 
 function getCollection(collectionName, uniqueCol) {
   var toReturn = db.getCollection(collectionName);
@@ -184,6 +213,7 @@ function restoreDatabase(callback) {
       whitelist = getCollection('whitelist', 'address');
       blacklist = getCollection('blacklist', null);
       recommendations = getCollection('recommendations', 'address');
+      messages = getCollection('messages', 'publicKey');
       callback(true);
     });
   } else {
@@ -191,6 +221,7 @@ function restoreDatabase(callback) {
     whitelist = getCollection('whitelist', 'address');
     blacklist = getCollection('blacklist', null);
     recommendations = getCollection('recommendations', 'address');
+    messages = getCollection('messages', 'publicKey');
     callback(false);
   }
 }
@@ -310,8 +341,70 @@ function getOldestSeen(address) {
 function getUserCountOldestRatedAddresses(publicKey) {
   //get oldest ratings for all ratings = 1 by self
   var allPublicKeyRatings = ratings.chain().find({'publicKey':publicKey}).data();
+  var allCount = {};
   for (rating in allPublicKeyRatings) {
     var oldestSeenRating = getOldestSeen(allPublicKeyRatings[rating].address);
     console.log(oldestSeenRating.publicKey, oldestSeenRating.address, oldestSeenRating.proofTimestamp);
+    if (oldestSeenRating.publicKey == publicKey) {
+      //self
+      continue;
+    }
+    if (!allCount[oldestSeenRating.publicKey]) {
+      allCount[oldestSeenRating.publicKey] = 0
+    }
+    allCount[oldestSeenRating.publicKey] += 1
+  }
+
+  return allCount;
+}
+
+function addBlacklist(publicKey, hostname, proofTimestamp) {
+  //TODO: Need to consider the case where person adding to blacklist is self...need to also blacklistPeers and remove
+
+  blacklist.insert({
+    hostname:hostname,
+    publicKey:publicKey,
+    proofTimestamp:proofTimestamp
+  });
+}
+
+function getNewAddressRisk(publicKey, hostname) { //returns risk out of 1
+  //get oldest ratings for all ratings = 1 by self
+  const userCounts = getUserCountOldestRatedAddresses(publicKey);
+  var totalPoints = 0;
+  var totalScore = 0;
+  for (userPublicKey in userCounts) {
+    var result = blacklist.chain().find({'$and': [{'publicKey' : userPublicKey},{'hostname' : hostname}]}).data()
+    if (result.length > 0) {
+      totalScore += userCounts[userPublicKey];
+    }
+    totalPoints += userCounts[userPublicKey];
+  }
+
+  return totalScore/totalPoints;
+}
+
+function handleNewMessage(publicKey, proofTimestamp) {
+  var results = messages.chain().find({'publicKey':publicKey}).limit(1).data();
+  var currentDate = new Date();
+  if (results.length > 0) {
+    var doc = results[0];
+    var timeSinceProof = (currentDate - new Date(proofTimestamp))/1000;
+    var timeSinceLastMessage = (currentDate - new Date(doc.proofTimestamp))/1000;
+    console.log("Time since proof:", timeSinceProof);
+    console.log("Time since last message:", timeSinceLastMessage);
+    if (timeSinceProof < 70 && timeSinceLastMessage > 30) {
+      doc.proofTimestamp = proofTimestamp;
+      messages.update(doc);
+      return true;
+    } else {
+      return false;
+    }
+  } else {
+    messages.insert({
+      publicKey:publicKey,
+      proofTimestamp:currentDate.toISOString()
+    });
+    return true;
   }
 }
