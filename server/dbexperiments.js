@@ -255,7 +255,6 @@ function backupDatabase() {
 
 
 function addRatingToDB(publicKey, address, hostname, rating, proofTimestamp) {
-  //TODO CHECK IF IN BLACKLIST
   if (checkIfBlacklist("1", hostname) == false) {
     ratings.insert({
       publicKey:publicKey,
@@ -399,7 +398,6 @@ function getUserCountOldestRatedAddresses(publicKey) {
 }
 
 async function addBlacklist(publicKey, hostname, proofTimestamp) {
-  //TODO: Need to consider the case where person adding to blacklist is self...need to also blacklistPeers and remove
   if (publicKey == "1") { //when user doing to self
     //remove hostname from whitelist
     var whitelistSet = whitelist.chain().find({'hostname':hostname});
