@@ -11,6 +11,8 @@ const cryptr = require('cryptr');
 
 const crypto2 = require('crypto2');
 
+//TODO: ENSURE NO RATING IF ON BLACKLIST (THREAD SAFE) -> HAVE ARRAY OF ITEMS TO PROCESS SERIALLY ($$$)
+  //if not singlethreaded, could be some big problems when recieving a message while updating loki
 async function getKeys() {
   if (conf.has('publicKey') == false) {
     console.log("CREATING KEY PAIRS");
@@ -81,7 +83,6 @@ var db = new loki('sandbox', {
       });
     },
     loadDatabase: async function(dbname, callback) {
-      // TODO: LOAD AND DECRYPT FROM IPFS
       getAndDecryptString(conf.get('db'), function(error, decryptedFile) {
         if (error) {
           callback(new Error("There was a problem loading the database"));
@@ -146,7 +147,14 @@ node.on('ready', async () => { //wait to run command line until IPFS initialized
     console.log("Next Recommendation:", getRecommendation());
     console.log("Next Recommendation:", getRecommendation());
     console.log("Next Recommendation:", getRecommendation());
-    // backupDatabase();
+
+    //TEST ADD WHITELIST AFTER BLACKLIST
+    addWhitelist("addressk", "hostnamek");
+    addBlacklist("1", "hostnamek", "2018-11-07T00:53:40Z");
+    addWhitelist("addressk", "hostnamek");
+    addRatingToDB("4", "adresskk", "hostnamek", 1, "2018-11-05T00:53:40Z")
+
+
 
     console.log("oldest:", "url2", getOldestSeen("url2"));
     console.log("oldest:", "url6", getOldestSeen("url6"));
@@ -177,6 +185,8 @@ node.on('ready', async () => { //wait to run command line until IPFS initialized
       //test blacklist peers
       addBlacklist("1", "hostname10", "2018-11-07T00:53:40Z");
       handleNewMessage("4", (new Date()).toISOString());
+
+      //
     })
 
   });
@@ -192,8 +202,6 @@ let whitelist;
 let blacklist;
 let recommendations;
 let messages;
-
-//TODO
 let blacklistPeers;
 
 function getCollection(collectionName, uniqueCol) {
@@ -214,9 +222,6 @@ function getCollection(collectionName, uniqueCol) {
 
 
 function restoreDatabase(callback) {
-  //TODO: originalUrls, blacklist peers, blacklistedItemsForPublicKey, mostRecentMessageTime
-
-
   if (conf.has('db')) {
     db.loadDatabase({}, function() {
       ratings = getCollection('ratings', null);
@@ -251,14 +256,20 @@ function backupDatabase() {
 
 function addRatingToDB(publicKey, address, hostname, rating, proofTimestamp) {
   //TODO CHECK IF IN BLACKLIST
+  if (checkIfBlacklist("1", hostname) == false) {
+    ratings.insert({
+      publicKey:publicKey,
+      address:address,
+      hostname:hostname,
+      rating:rating,
+      proofTimestamp:proofTimestamp
+    });
+  } else {
+    console.log("Didn't add rating because in blacklist!");
+  }
 
-  ratings.insert({
-    publicKey:publicKey,
-    address:address,
-    hostname:hostname,
-    rating:rating,
-    proofTimestamp:proofTimestamp
-  });
+
+
 }
 
 function deleteForHostname(hostname) {
@@ -272,14 +283,19 @@ function deleteForPublicKey(publicKey) {
 
 
 function addWhitelist(address, hostname) { //added unique specifier
-  try {
-    whitelist.insert({
-      address:address,
-      hostname:hostname
-    });
-  } catch (error) {
-    console.log("Can't add to whitelist!", error);
+  if (checkIfBlacklist("1", hostname) == false) {
+    try {
+      whitelist.insert({
+        address:address,
+        hostname:hostname
+      });
+    } catch (error) {
+      console.log("Can't add to whitelist!", error);
+    }
+  } else {
+    console.log("Didn't add whitelist because in blacklist!");
   }
+
 }
 
 function addBlacklistPeer(publicKey) { //added unique specifier
@@ -415,8 +431,15 @@ async function addBlacklist(publicKey, hostname, proofTimestamp) {
     publicKey:publicKey,
     proofTimestamp:proofTimestamp
   });
+}
 
-
+function checkIfBlacklist(publicKey, hostname) {
+  var result = blacklist.chain().find({'$and': [{'publicKey' : publicKey},{'hostname' : hostname}]}).data()
+  if (result.length > 0) {
+    return true;
+  } else {
+    return false;
+  }
 }
 
 function getNewAddressRisk(publicKey, hostname) { //returns risk out of 1
@@ -436,7 +459,6 @@ function getNewAddressRisk(publicKey, hostname) { //returns risk out of 1
 }
 
 function handleNewMessage(publicKey, proofTimestamp) {
-  //todo check if a blacklist peer
   var blacklistPeerResults = blacklistPeers.chain().find({'publicKey':publicKey}).limit(1).data();
   if (blacklistPeerResults.length > 0) {
     console.log("Drop message because blacklist peer", blacklistPeerResults);
