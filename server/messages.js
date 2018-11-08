@@ -9,6 +9,7 @@ const crypto2 = require('crypto2');
 function messages(IPFSNode, conf) {
   this.IPFSNode = IPFSNode;
   this.conf = conf;
+  this.goalDelay = 60;
   this.storeHashInChainpoint = async function(hashToStore) {
 
     // Submit each hash to three randomly selected Nodes
@@ -69,8 +70,6 @@ function messages(IPFSNode, conf) {
       this.messageQueue.push([url, rating]);
     }
   }
-
-  this.goalDelay = 60;
 
   this.createMessage = async function (url, rating) {
     /**
@@ -178,6 +177,7 @@ function messages(IPFSNode, conf) {
               const parsedPayload = JSON.parse(parsedMessage["message"]["payload"]);
               var toReturn = {
                 creationTime:creationTime,
+                recievedTime:(new Date()).toISOString(),
                 publicKey:parsedMessage["message"]["publicKey"],
                 rating:parsedPayload["rating"],
                 url:parsedPayload["url"],

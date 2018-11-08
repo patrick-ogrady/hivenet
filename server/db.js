@@ -165,6 +165,7 @@ function db(IPFSNode, conf) {
     /** message should be an already validated dictionary object returned from messages.parseMessage
     {
       creationTime,
+      recievedTime,
       publicKey,
       rating,
       url,
@@ -174,7 +175,7 @@ function db(IPFSNode, conf) {
     };
     **/
 
-    //check if creationTime is within last Y seconds (unless processing a chain)
+    //check if creationTime is within Y seconds of recievedTime (unless processing a chain)
       //drop message
 
     //check if publicKey in blacklistPeers
