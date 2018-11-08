@@ -113,7 +113,7 @@ function db(IPFSNode, conf) {
 
     let dbExists = await promise;
 
-    this.messages = this.getCollection('messages');
+    this.messages = this.getCollection('messages', 'messageIPFS');
     this.blacklistPeers = this.getCollection('blacklistPeers', 'publicKey');
     this.whitelist = this.getCollection('whitelist', 'address');
 
@@ -149,6 +149,40 @@ function db(IPFSNode, conf) {
 
   this.processMessage = function(message) { //input message should not be a IPFS address (otherwise would have to poll IPFS for every incoming message)
     this.inProcess = true;
+
+    /** message should be an already validated dictionary object returned from messages.parseMessage
+    {
+      creationTime,
+      publicKey,
+      rating,
+      url,
+      messageIndex,
+      messageIPFS,
+      lastMessageIPFS (optional)
+    };
+    **/
+
+    //check if creationTime is within last Y seconds (unless processing a chain)
+      //drop message
+
+    //check if publicKey in blacklistPeers
+      //drop message
+
+    //check if messageIPFS already stored in messages
+      //drop message
+
+    //check if messageIndex for publicKey already stored
+      //blacklist -> personal fork detected
+
+    //check if message history now means that two messages were proof marked
+    //less than X seconds apart
+      //blacklist -> attack detected
+
+    //addToDB
+
+    //Broadcast (unless processing a chain...would get dropped by other clients because old message)
+
+
 
     //mirror processing
     setTimeout(() => {
