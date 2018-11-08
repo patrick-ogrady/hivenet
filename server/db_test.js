@@ -39,12 +39,30 @@ node.on('ready', async () => {
 
   // const {publicKey, privateKey} = await getKeys();
   //
-  // var dbObject = new db(node, conf);
-  //
-  // let backupFound = await dbObject.restoreDatabase();
-  // console.log("Database Restored:",backupFound);
-  // await dbObject.backupDatabase();
-  // console.log("Database Backed Up!");
+  const timeoutLimit = 60;
+  var dbObject = new db(node, conf, timeoutLimit);
+  let backupFound = await dbObject.restoreDatabase();
+  console.log("Database Restored:",backupFound);
+  await dbObject.backupDatabase();
+  console.log("Database Backed Up!");
+
+  var messagesObject = new messages(node, conf, timeoutLimit);
+  // messagesObject.createMessageQueue("url1", 1);
+  // messagesObject.createMessageQueue("url2", 1);
+  // messagesObject.createMessageQueue("url3", 1);
+  // messagesObject.createMessageQueue("url4", 1);
+  // messagesObject.createMessageQueue("url5", 1);
+
+  try {
+    let IPFSText = await messagesObject.getPreviousMessage("QmaZMQHLyZsUiZnpZ118NL3jEZas9RKSw1wvXaYdZofpVn");
+    console.log("IPFS Text:", IPFSText);
+    const parsedMessage = await messagesObject.parseMessage(IPFSText);
+    console.log("Parsed Message:", parsedMessage);
+    dbObject.processMessageQueue(parsedMessage, false);
+  } catch {
+    console.log("Invalid Proof or IPFS Text!");
+  }
+
   //
   // var i = 0
   // while (i < 10) {
@@ -62,20 +80,4 @@ node.on('ready', async () => {
   //   }
 
   // }, 1000 * 10);
-
-  var messagesObject = new messages(node, conf);
-  // messagesObject.createMessageQueue("url1", 1);
-  // messagesObject.createMessageQueue("url2", 1);
-  // messagesObject.createMessageQueue("url3", 1);
-  // messagesObject.createMessageQueue("url4", 1);
-  // messagesObject.createMessageQueue("url5", 1);
-
-  try {
-    let IPFSText = await messagesObject.getPreviousMessage("QmaZMQHLyZsUiZnpZ118NL3jEZas9RKSw1wvXaYdZofpVn");
-    console.log("IPFS Text:", IPFSText);
-    const status = await messagesObject.parseMessage(IPFSText);
-    console.log("Get Status:", status);
-  } catch {
-    console.log("Invalid IPFS Text!");
-  }
 });

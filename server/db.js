@@ -2,9 +2,10 @@
 const loki = require('lokijs');
 const cryptr = require('cryptr');
 
-function db(IPFSNode, conf) {
+function db(IPFSNode, conf, timeoutLimit) {
   this.IPFSNode = IPFSNode;
   this.conf = conf;
+  this.timeoutLimit = timeoutLimit;
 
   //DB COLLECTIONS
   this.messages = null;
@@ -174,6 +175,15 @@ function db(IPFSNode, conf) {
       lastMessageIPFS (optional)
     };
     **/
+
+    if (historicalMessage == false) {
+      var oldness = (new Date(message.recievedTime) - new Date(message.creationTime))/1000;
+      if (oldness > this.timeoutLimit) {
+        console.log("DROPPING MESSAGE FOR TIMEOUT:", message.messageIPFS, oldness);
+        this.endProcessMessage();
+        return;
+      }
+    }
 
     //check if creationTime is within Y seconds of recievedTime (unless processing a chain)
       //drop message

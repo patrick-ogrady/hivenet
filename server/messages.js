@@ -6,10 +6,10 @@ const chp = require('chainpoint-client');
 const cryptr = require('cryptr');
 const crypto2 = require('crypto2');
 
-function messages(IPFSNode, conf) {
+function messages(IPFSNode, conf, timeoutLimit) {
   this.IPFSNode = IPFSNode;
   this.conf = conf;
-  this.goalDelay = 60;
+  this.timeoutLimit = timeoutLimit;
   this.storeHashInChainpoint = async function(hashToStore) {
 
     // Submit each hash to three randomly selected Nodes
@@ -144,7 +144,7 @@ function messages(IPFSNode, conf) {
     await this.sendMessage(messageToSend);
 
     var timeSinceCreation = (new Date() - new Date(verifiedProof["hashSubmittedCoreAt"]))/1000;
-    var timeToWait = this.goalDelay - timeSinceCreation;
+    var timeToWait = this.timeoutLimit - timeSinceCreation;
     console.log("Time to wait:", timeToWait);
     setTimeout(() => {
       if (this.messageQueue.length) {
@@ -161,6 +161,7 @@ function messages(IPFSNode, conf) {
 
   this.parseMessage = async function(recievedMessage) { //returns null if not valid, otherwise creation time
     const parsedMessage = JSON.parse(recievedMessage);
+    const recievedTime = (new Date()).toISOString();
 
     if ("proof" in parsedMessage) {
       const creationTime = await this.verifyProofInChainpoint(parsedMessage["proof"]);
@@ -169,15 +170,19 @@ function messages(IPFSNode, conf) {
           if ("signature" in parsedMessage["message"] && "publicKey" in parsedMessage["message"] && "payload" in parsedMessage["message"]) {
             const isSignatureValid = await crypto2.verify.sha256(parsedMessage["message"]["payload"], parsedMessage["message"]["publicKey"], parsedMessage["message"]["signature"]);
             if (isSignatureValid == true) {
-              const timeSinceCreation = (new Date() - new Date(creationTime))/1000;
+              const timeSinceCreation = (new Date(recievedTime) - new Date(creationTime))/1000;
               console.log("Time Since Creation(s):", timeSinceCreation);
+
+              const validationTime = (new Date() - new Date(recievedTime))/1000;
+              console.log("Validation Time(s):", validationTime);
+
               if (parsedMessage["message"]["publicKey"] == this.conf.get('publicKey')) {
                 console.log("WARNING THIS MESSAGE FROM SELF!");
               }
               const parsedPayload = JSON.parse(parsedMessage["message"]["payload"]);
               var toReturn = {
                 creationTime:creationTime,
-                recievedTime:(new Date()).toISOString(),
+                recievedTime:recievedTime,
                 publicKey:parsedMessage["message"]["publicKey"],
                 rating:parsedPayload["rating"],
                 url:parsedPayload["url"],
