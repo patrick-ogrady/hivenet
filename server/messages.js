@@ -172,7 +172,27 @@ function messages(IPFSNode, conf) {
               if (parsedMessage["message"]["publicKey"] == this.conf.get('publicKey')) {
                 console.log("WARNING THIS MESSAGE FROM SELF!");
               }
-              return creationTime;
+              const parsedPayload = JSON.parse(parsedMessage["message"]["payload"]);
+              var toReturn = {
+                creationTime:creationTime,
+                publicKey:parsedMessage["message"]["publicKey"],
+                rating:parsedPayload["rating"],
+                url:parsedPayload["url"],
+                messageIndex:parsedPayload["messageIndex"],
+              };
+              if (parsedPayload["lastMessageIPFS"]) {
+                toReturn["lastMessageIPFS"] = parsedPayload["lastMessageIPFS"]
+              }
+              let promise = new Promise((resolve, reject) => {
+                this.IPFSNode.files.add({
+                  content: Buffer.from(recievedMessage)
+                },{onlyHash:true}, (err, res) => {
+                  resolve(res[0].hash);
+                });
+              });
+              let messageIPFS = await promise;
+              toReturn["messageIPFS"] = messageIPFS
+              return toReturn;
             } else {
               return null;
             }
