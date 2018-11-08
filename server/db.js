@@ -136,18 +136,19 @@ function db(IPFSNode, conf) {
   this.messageQueue = [];
 
   //message passed in should already be parsed...just adding
-  this.processMessageQueue = function(message) {
+  this.processMessageQueue = function(message, historicalMessage) {
+    //historical message is a boolean indicating if older message
     if (!this.inProcess) {
       console.log("Nothing in process!");
-      this.processMessage(message);
+      this.processMessage(message, historicalMessage);
     } else {
       console.log("Message in Queue:", this.messageQueue.length);
-      this.messageQueue.push(message);
+      this.messageQueue.push([message, historicalMessage]);
     }
   }
 
 
-  this.processMessage = function(message) { //input message should not be a IPFS address (otherwise would have to poll IPFS for every incoming message)
+  this.processMessage = function(message, historicalMessage) { //input message should not be a IPFS address (otherwise would have to poll IPFS for every incoming message)
     this.inProcess = true;
 
     /** message should be an already validated dictionary object returned from messages.parseMessage
@@ -191,7 +192,8 @@ function db(IPFSNode, conf) {
       // see if anything else is in the queue to process
       if (this.messageQueue.length) {
         // pull out oldest message and process it
-        this.processMessage(this.messageQueue.shift());
+        var nextMessage = this.messageQueue.shift();
+        this.processMessage(nextMessage[0], nextMessage[1]);
       } else {
         //in the case that there is a race condition something could sit in messaging slightly too long
         this.inProcess = false;

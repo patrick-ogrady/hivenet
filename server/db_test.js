@@ -48,7 +48,7 @@ node.on('ready', async () => {
 
   var i = 0
   while (i < 10) {
-    dbObject.processMessageQueue(i);
+    dbObject.processMessageQueue(i, false);
     i += 1;
   }
 
@@ -57,7 +57,7 @@ node.on('ready', async () => {
   setTimeout(() => {
     i = 10
     while (i < 20) {
-      dbObject.processMessageQueue(i);
+      dbObject.processMessageQueue(i, false);
       i += 1;
     }
 
