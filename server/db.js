@@ -133,6 +133,8 @@ function db(IPFSNode, conf) {
   //TODO: SERIAL EVENT PROCESSING: https://stackoverflow.com/questions/39044183/serially-processing-a-queue-of-messages-whose-processing-is-async
   this.inProcess = false;
   this.messageQueue = [];
+
+  //message passed in should already be parsed...just adding
   this.processMessageQueue = function(message) {
     if (!this.inProcess) {
       console.log("Nothing in process!");

@@ -66,10 +66,18 @@ node.on('ready', async () => {
   // })
 
   var messagesObject = new messages(node, conf);
-  messagesObject.createMessageQueue("url1", 1);
-  messagesObject.createMessageQueue("url2", 1);
-  messagesObject.createMessageQueue("url3", 1);
-  messagesObject.createMessageQueue("url4", 1);
-  messagesObject.createMessageQueue("url5", 1);
+  // messagesObject.createMessageQueue("url1", 1);
+  // messagesObject.createMessageQueue("url2", 1);
+  // messagesObject.createMessageQueue("url3", 1);
+  // messagesObject.createMessageQueue("url4", 1);
+  // messagesObject.createMessageQueue("url5", 1);
+
+  messagesObject.getPreviousMessage("QmaZMQHLyZsUiZnpZ118NL3jEZas9RKSw1wvXaYdZofpVn", async function(success, text) {
+    console.log("IPFS GET:", success, text);
+    if (success) {
+      const status = await messagesObject.checkMessageFormat(text);
+      console.log("Get Status:", status);
+    }
+  })
 
 });

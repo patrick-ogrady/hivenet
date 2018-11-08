@@ -167,28 +167,42 @@ function messages(IPFSNode, conf) {
           if ("signature" in parsedMessage["message"] && "publicKey" in parsedMessage["message"] && "payload" in parsedMessage["message"]) {
             const isSignatureValid = await crypto2.verify.sha256(parsedMessage["message"]["payload"], parsedMessage["message"]["publicKey"], parsedMessage["message"]["signature"]);
             if (isSignatureValid == true) {
+              const timeSinceCreation = (new Date() - new Date(creationTime))/1000;
+              console.log("Time Since Creation(s):", timeSinceCreation);
               if (parsedMessage["message"]["publicKey"] == this.conf.get('publicKey')) {
-                return false;
-              } else {
-                const timeSinceCreation = (new Date() - new Date(creationTime))/1000;
-                console.log("Time Since Creation(s):", timeSinceCreation);
-                return true;
+                console.log("WARNING THIS MESSAGE FROM SELF!");
               }
+              return true;
             } else {
               return false;
             }
           } else {
+            console.log("SIGNATURE, PUBLICKEY, OR PAYLOAD MISSING!");
             return false;
           }
         } else {
+          console.log("MESSAGE MISSING!");
           return false;
         }
       } else {
+        console.log("CREATION TIME IS NULL!");
         return false
       }
     } else {
+      console.log("NO PROOF PRESENT!");
       return false;
     }
+  }
+
+
+  this.getPreviousMessage = async function(IPFSAddressHash, callback) {
+    this.IPFSNode.files.cat(IPFSAddressHash, function(err, file) {
+      if (err) {
+        callback(false, err);
+      } else {
+        callback(true, file.toString());
+      }
+    });
   }
 }
 
