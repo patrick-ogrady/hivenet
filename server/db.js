@@ -52,7 +52,7 @@ function db(IPFSNode, conf) {
   this.encryptAndStoreString = function(input_string, callback) {
     const encrypter = new cryptr(this.conf.get('privateKey'));
     const encryptedString = encrypter.encrypt(input_string);
-    const filesAdded = this.IPFSNode.files.add({
+    this.IPFSNode.files.add({
       content: Buffer.from(encryptedString)
     }, function(err, res) {
       if (err) {
@@ -66,11 +66,11 @@ function db(IPFSNode, conf) {
   this.getAndDecryptString = function(ipfs_address, callback) {
     try {
       const encrypter = new cryptr(this.conf.get('privateKey'));
-      IPFSNode.pin.add(ipfs_address, function(err) {
+      this.IPFSNode.pin.add(ipfs_address, function(err) {
         if (err) {
           callback(err, "");
         } else {
-          IPFSNode.files.cat(ipfs_address, function(err, file) {
+          this.IPFSNode.files.cat(ipfs_address, function(err, file) {
             if (err) {
               callback(err, "");
             } else {
@@ -101,7 +101,8 @@ function db(IPFSNode, conf) {
     }
   }
 
-  this.restoreDatabase = function(callback) {
+  //TODO: FORMALIZE MESSAGES DB -> IPFS HASH:PUBLIC_KEY:URL:HOSTNAME:RATING:PROOF:TIMESTAMP
+  this.restoreDatabase = function(callback) { //must run before starting
     if (this.conf.has('db') == false) {
       this.ratings = this.getCollection('ratings', null);
       this.whitelist = this.getCollection('whitelist', 'address');
@@ -126,6 +127,44 @@ function db(IPFSNode, conf) {
 
   this.backupDatabase = function(callback) {
     this.lokiDB.saveDatabase(callback);
+  }
+
+
+  //TODO: SERIAL EVENT PROCESSING: https://stackoverflow.com/questions/39044183/serially-processing-a-queue-of-messages-whose-processing-is-async
+  this.inProcess = false;
+  this.messageQueue = [];
+  this.processMessageQueue = function(message) {
+    if (!this.inProcess) {
+      console.log("Nothing in process!");
+      this.processMessage(message);
+    } else {
+      console.log("Message in Queue:", this.messageQueue.length);
+      this.messageQueue.push(message);
+    }
+  }
+
+
+  this.processMessage = function(message) { //input message should not be a IPFS address (otherwise would have to poll IPFS for every incoming message)
+    this.inProcess = true;
+
+    //mirror processing
+    setTimeout(() => {
+      //code to be executed after 10 second
+      console.log(message);
+      // see if anything else is in the queue to process
+      if (this.messageQueue.length) {
+        // pull out oldest message and process it
+        this.processMessage(this.messageQueue.shift());
+      } else {
+        //in the case that there is a race condition something could sit in messaging slightly too long
+        this.inProcess = false;
+      }
+
+    }, 1000 * 3);
+
+    //mark complete
+
+
   }
 
 }
