@@ -6,6 +6,14 @@ function db(IPFSNode, conf) {
   this.IPFSNode = IPFSNode;
   this.conf = conf;
 
+  //DB COLLECTIONS
+  this.ratings = null;
+  this.whitelist = null;
+  this.blacklist = null;
+  this.recommendations = null;
+  this.messages = null;
+  this.blacklistPeers = null;
+
   this.lokiDB = new loki('sandbox', {
     adapter: {
       mode:"reference",
@@ -95,41 +103,29 @@ function db(IPFSNode, conf) {
 
   this.restoreDatabase = function(callback) {
     if (this.conf.has('db') == false) {
-      ratings = this.getCollection('ratings', null);
-      whitelist = this.getCollection('whitelist', 'address');
-      blacklist = this.getCollection('blacklist', null);
-      recommendations = this.getCollection('recommendations', 'address');
-      messages = this.getCollection('messages', 'publicKey');
-      blacklistPeers = this.getCollection('blacklistPeers', 'publicKey');
+      this.ratings = this.getCollection('ratings', null);
+      this.whitelist = this.getCollection('whitelist', 'address');
+      this.blacklist = this.getCollection('blacklist', null);
+      this.recommendations = this.getCollection('recommendations', 'address');
+      this.messages = this.getCollection('messages', 'publicKey');
+      this.blacklistPeers = this.getCollection('blacklistPeers', 'publicKey');
       callback(false);
     } else {
       this.lokiDB.loadDatabase({}, () => {
-        ratings = this.getCollection('ratings', null);
-        whitelist = this.getCollection('whitelist', 'address');
-        blacklist = this.getCollection('blacklist', null);
-        recommendations = this.getCollection('recommendations', 'address');
-        messages = this.getCollection('messages', 'publicKey');
-        blacklistPeers = this.getCollection('blacklistPeers', 'publicKey');
+        this.ratings = this.getCollection('ratings', null);
+        this.whitelist = this.getCollection('whitelist', 'address');
+        this.blacklist = this.getCollection('blacklist', null);
+        this.recommendations = this.getCollection('recommendations', 'address');
+        this.messages = this.getCollection('messages', 'publicKey');
+        this.blacklistPeers = this.getCollection('blacklistPeers', 'publicKey');
         callback(true);
       });
     }
 
   }
 
-  this.backupDatabase = function() {
-    this.lokiDB.saveDatabase();
-  }
-
-  this.hello = function() {
-    return 'hello!';
-  }
-
-  this.goodbye = function() {
-    return 'goodbye!';
-  }
-
-  this.input = function() {
-    return this.inputString;
+  this.backupDatabase = function(callback) {
+    this.lokiDB.saveDatabase(callback);
   }
 
 }
