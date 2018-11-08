@@ -11,6 +11,8 @@ const cryptr = require('cryptr');
 
 const crypto2 = require('crypto2');
 
+//TODO: DON'T REMOVE ? PARAMS
+
 //TODO: ENSURE NO RATING IF ON BLACKLIST (THREAD SAFE) -> HAVE ARRAY OF ITEMS TO PROCESS SERIALLY ($$$)
   //if not singlethreaded, could be some big problems when recieving a message while updating loki
 async function getKeys() {
@@ -79,7 +81,6 @@ var db = new loki('sandbox', {
           conf.set('db', ipfs_address);
           callback(null);
         }
-
       });
     },
     loadDatabase: async function(dbname, callback) {
