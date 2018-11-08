@@ -148,6 +148,17 @@ function db(IPFSNode, conf) {
   }
 
 
+  this.endProcessMessage = function() { //used as a return function if stop early
+    if (this.messageQueue.length) {
+      // pull out oldest message and process it
+      var nextMessage = this.messageQueue.shift();
+      this.processMessage(nextMessage[0], nextMessage[1]);
+    } else {
+      //in the case that there is a race condition something could sit in messaging slightly too long
+      this.inProcess = false;
+    }
+  }
+
   this.processMessage = function(message, historicalMessage) { //input message should not be a IPFS address (otherwise would have to poll IPFS for every incoming message)
     this.inProcess = true;
 
@@ -187,17 +198,10 @@ function db(IPFSNode, conf) {
 
     //mirror processing
     setTimeout(() => {
-      //code to be executed after 10 second
       console.log(message);
+      //code to be executed after 10 second
       // see if anything else is in the queue to process
-      if (this.messageQueue.length) {
-        // pull out oldest message and process it
-        var nextMessage = this.messageQueue.shift();
-        this.processMessage(nextMessage[0], nextMessage[1]);
-      } else {
-        //in the case that there is a race condition something could sit in messaging slightly too long
-        this.inProcess = false;
-      }
+      this.endProcessMessage();
 
     }, 1000 * 3);
 
