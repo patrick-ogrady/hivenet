@@ -7,12 +7,9 @@ function db(IPFSNode, conf) {
   this.conf = conf;
 
   //DB COLLECTIONS
-  this.ratings = null;
-  this.whitelist = null;
-  this.blacklist = null;
-  this.recommendations = null;
   this.messages = null;
   this.blacklistPeers = null;
+  this.whitelist = null;
 
   this.lokiDB = new loki('sandbox', {
     adapter: {
@@ -66,7 +63,7 @@ function db(IPFSNode, conf) {
   this.getAndDecryptString = function(ipfs_address, callback) {
     try {
       const encrypter = new cryptr(this.conf.get('privateKey'));
-      this.IPFSNode.pin.add(ipfs_address, function(err) {
+      this.IPFSNode.pin.add(ipfs_address, (err) => {
         if (err) {
           callback(err, "");
         } else {
@@ -102,31 +99,35 @@ function db(IPFSNode, conf) {
   }
 
   //TODO: FORMALIZE MESSAGES DB -> IPFS HASH:PUBLIC_KEY:URL:HOSTNAME:RATING:PROOF:TIMESTAMP
-  this.restoreDatabase = function(callback) { //must run before starting
-    if (this.conf.has('db') == false) {
-      this.ratings = this.getCollection('ratings', null);
-      this.whitelist = this.getCollection('whitelist', 'address');
-      this.blacklist = this.getCollection('blacklist', null);
-      this.recommendations = this.getCollection('recommendations', 'address');
-      this.messages = this.getCollection('messages', 'publicKey');
-      this.blacklistPeers = this.getCollection('blacklistPeers', 'publicKey');
-      callback(false);
-    } else {
-      this.lokiDB.loadDatabase({}, () => {
-        this.ratings = this.getCollection('ratings', null);
-        this.whitelist = this.getCollection('whitelist', 'address');
-        this.blacklist = this.getCollection('blacklist', null);
-        this.recommendations = this.getCollection('recommendations', 'address');
-        this.messages = this.getCollection('messages', 'publicKey');
-        this.blacklistPeers = this.getCollection('blacklistPeers', 'publicKey');
-        callback(true);
-      });
-    }
+  this.restoreDatabase = async function(callback) { //must run before starting
+
+    let promise = new Promise((resolve, reject) => {
+      if (this.conf.has('db') == true) {
+        this.lokiDB.loadDatabase({}, () => {
+          resolve(true);
+        });
+      } else {
+        resolve(false);
+      }
+    });
+
+    let dbExists = await promise;
+
+    this.messages = this.getCollection('messages');
+    this.blacklistPeers = this.getCollection('blacklistPeers', 'publicKey');
+    this.whitelist = this.getCollection('whitelist', 'address');
+
+    return dbExists;
 
   }
 
-  this.backupDatabase = function(callback) {
-    this.lokiDB.saveDatabase(callback);
+  this.backupDatabase = async function(callback) {
+    let promise = new Promise((resolve, reject) => {
+      this.lokiDB.saveDatabase(() => {
+        resolve();
+      });
+    });
+
   }
 
 

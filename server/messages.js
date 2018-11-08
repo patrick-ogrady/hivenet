@@ -17,7 +17,7 @@ function messages(IPFSNode, conf) {
     console.log(proofHandles)
 
     // Wait for Calendar proofs to be available
-    console.log("Sleeping 12 seconds to wait for proofs to generate...")
+    console.log("Sleeping 20 seconds to wait for proofs to generate...")
     await new Promise(resolve => setTimeout(resolve, 20000))
 
     // Retrieve a Calendar proof for each hash that was submitted
@@ -126,38 +126,41 @@ function messages(IPFSNode, conf) {
     const messageToSend = JSON.stringify({proof:proofToUse, message:{signature:signature, publicKey:this.conf.get('publicKey'), payload:payload}});
     console.log("message to send:", messageToSend, "\n");
 
-    // const valid_message = await this.checkMessageFormat(messageToSend);
+    // const valid_message = await this.parseMessage(messageToSend);
     // console.log("Valid Message:", valid_message);
 
     //add to ipfs
-    this.IPFSNode.files.add({
-      content: Buffer.from(messageToSend)
-    }, (err, res) => {
-      if (err) {
-        console.log("SAVE ERROR:", err);
-      } else {
-        this.conf.set('lastIPFS', res[0].hash);
-        console.log("MESSAGE IPFS:", res[0].hash);
-      }
+    let promise = new Promise((resolve, reject) => {
+      this.IPFSNode.files.add({
+        content: Buffer.from(messageToSend)
+      }, (err, res) => {
+        resolve(res[0].hash);
+      });
+    });
 
-      var timeSinceCreation = (new Date() - new Date(verifiedProof["hashSubmittedCoreAt"]))/1000;
-      var timeToWait = this.goalDelay - timeSinceCreation;
-      console.log("Time to wait:", timeToWait);
-      setTimeout(() => {
-        if (this.messageQueue.length) {
-          // pull out oldest message and process it
-          var nextMessage = this.messageQueue.shift();
-          this.createMessage(nextMessage[0], nextMessage[1]);
-        } else {
-          //in the case that there is a race condition something could sit in messaging slightly too long
-          this.inProcess = false;
-        }
-      }, 1000 * timeToWait);
-    })
+    let IPFSHash = await promise;
+    this.conf.set('lastIPFS', IPFSHash);
+    console.log("MESSAGE IPFS:", IPFSHash);
+
+    await this.sendMessage(messageToSend);
+
+    var timeSinceCreation = (new Date() - new Date(verifiedProof["hashSubmittedCoreAt"]))/1000;
+    var timeToWait = this.goalDelay - timeSinceCreation;
+    console.log("Time to wait:", timeToWait);
+    setTimeout(() => {
+      if (this.messageQueue.length) {
+        // pull out oldest message and process it
+        var nextMessage = this.messageQueue.shift();
+        this.createMessage(nextMessage[0], nextMessage[1]);
+      } else {
+        //in the case that there is a race condition something could sit in messaging slightly too long
+        this.inProcess = false;
+      }
+    }, 1000 * timeToWait);
   }
 
 
-  this.checkMessageFormat = async function(recievedMessage) { //returns null if not valid, otherwise creation time
+  this.parseMessage = async function(recievedMessage) { //returns null if not valid, otherwise creation time
     const parsedMessage = JSON.parse(recievedMessage);
 
     if ("proof" in parsedMessage) {
@@ -191,7 +194,7 @@ function messages(IPFSNode, conf) {
                 });
               });
               let messageIPFS = await promise;
-              toReturn["messageIPFS"] = messageIPFS
+              toReturn["messageIPFS"] = messageIPFS;
               return toReturn;
             } else {
               return null;
@@ -216,13 +219,21 @@ function messages(IPFSNode, conf) {
 
 
   this.getPreviousMessage = async function(IPFSAddressHash, callback) {
-    this.IPFSNode.files.cat(IPFSAddressHash, function(err, file) {
-      if (err) {
-        callback(false, err);
-      } else {
-        callback(true, file.toString());
-      }
+    let promise = new Promise((resolve, reject) => {
+      this.IPFSNode.files.cat(IPFSAddressHash, function(err, file) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(file.toString());
+        }
+      });
     });
+    return await promise;
+  }
+
+  this.sendMessage = async function(messageToSend) {
+    //TODO: SEND MESSAGE ON IPFS PUBSUB
+    console.log("Should send message!:", messageToSend);
   }
 }
 
