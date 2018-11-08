@@ -126,8 +126,8 @@ function messages(IPFSNode, conf) {
     const messageToSend = JSON.stringify({proof:proofToUse, message:{signature:signature, publicKey:this.conf.get('publicKey'), payload:payload}});
     console.log("message to send:", messageToSend, "\n");
 
-    const valid_message = await this.checkMessageFormat(messageToSend);
-    console.log("Valid Message:", valid_message);
+    // const valid_message = await this.checkMessageFormat(messageToSend);
+    // console.log("Valid Message:", valid_message);
 
     //add to ipfs
     this.IPFSNode.files.add({
@@ -157,7 +157,7 @@ function messages(IPFSNode, conf) {
   }
 
 
-  this.checkMessageFormat = async function(recievedMessage) {
+  this.checkMessageFormat = async function(recievedMessage) { //returns null if not valid, otherwise creation time
     const parsedMessage = JSON.parse(recievedMessage);
 
     if ("proof" in parsedMessage) {
@@ -172,25 +172,25 @@ function messages(IPFSNode, conf) {
               if (parsedMessage["message"]["publicKey"] == this.conf.get('publicKey')) {
                 console.log("WARNING THIS MESSAGE FROM SELF!");
               }
-              return true;
+              return creationTime;
             } else {
-              return false;
+              return null;
             }
           } else {
             console.log("SIGNATURE, PUBLICKEY, OR PAYLOAD MISSING!");
-            return false;
+            return null;
           }
         } else {
           console.log("MESSAGE MISSING!");
-          return false;
+          return null;
         }
       } else {
         console.log("CREATION TIME IS NULL!");
-        return false
+        return null;
       }
     } else {
       console.log("NO PROOF PRESENT!");
-      return false;
+      return null;
     }
   }
 
