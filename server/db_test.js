@@ -34,34 +34,51 @@ const node = new IPFS({
 });
 
 
+function messageSent(IPFSHash, messageIndex) {
+
+}
+
+
 node.on('ready', async () => {
   // conf.delete('db');
+  conf.delete('messageIndex');
+  conf.delete('lastIPFS');
 
-  // const {publicKey, privateKey} = await getKeys();
-  //
+
+
+  const {publicKey, privateKey} = await getKeys();
+
   const timeoutLimit = 60;
-  var dbObject = new db(node, conf, timeoutLimit);
-  let backupFound = await dbObject.restoreDatabase();
+  var dbObject = new db(node, privateKey, async (newBackupAddress) => {
+    console.log("Database Backup:", newBackupAddress);
+    //TODO: set conf for new db
+    conf.set('db', newBackupAddress);
+  }, timeoutLimit);
+
+
+  let backupFound = await dbObject.restoreDatabase(conf.get('db')); //(null);
   console.log("Database Restored:",backupFound);
   await dbObject.backupDatabase();
-  console.log("Database Backed Up!");
 
-  var messagesObject = new messages(node, conf, timeoutLimit);
-  // messagesObject.createMessageQueue("url1", 1);
+  var messagesObject = new messages(node, publicKey, privateKey, null, null, (IPFSHash, messageIndex) => {
+    console.log("Message Sent:", IPFSHash, messageIndex);
+    //TODO: set conf for new messageIndex and lastIPFS
+  }, timeoutLimit);
+  messagesObject.createMessageQueue("url1", 1);
   // messagesObject.createMessageQueue("url2", 1);
   // messagesObject.createMessageQueue("url3", 1);
   // messagesObject.createMessageQueue("url4", 1);
   // messagesObject.createMessageQueue("url5", 1);
 
-  try {
-    let IPFSText = await messagesObject.getPreviousMessage("QmaZMQHLyZsUiZnpZ118NL3jEZas9RKSw1wvXaYdZofpVn");
-    console.log("IPFS Text:", IPFSText);
-    const parsedMessage = await messagesObject.parseMessage(IPFSText);
-    console.log("Parsed Message:", parsedMessage);
-    dbObject.processMessageQueue(parsedMessage, false);
-  } catch {
-    console.log("Invalid Proof or IPFS Text!");
-  }
+  // try {
+  //   let IPFSText = await messagesObject.getPreviousMessage("QmaZMQHLyZsUiZnpZ118NL3jEZas9RKSw1wvXaYdZofpVn");
+  //   console.log("IPFS Text:", IPFSText);
+  //   const parsedMessage = await messagesObject.parseMessage(IPFSText);
+  //   console.log("Parsed Message:", parsedMessage);
+  //   dbObject.processMessageQueue(parsedMessage, false);
+  // } catch {
+  //   console.log("Invalid Proof or IPFS Text!");
+  // }
 
   //
   // var i = 0

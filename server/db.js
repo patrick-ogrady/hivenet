@@ -2,10 +2,11 @@
 const loki = require('lokijs');
 const cryptr = require('cryptr');
 
-function db(IPFSNode, conf, timeoutLimit) {
+function db(IPFSNode, privateKey, dbBackedUp, timeoutLimit) {
   this.IPFSNode = IPFSNode;
-  this.conf = conf;
+  this.privateKey = privateKey;
   this.timeoutLimit = timeoutLimit;
+  this.newDBBackup = dbBackedUp;
 
   //DB COLLECTIONS
   this.messages = null;
@@ -25,20 +26,20 @@ function db(IPFSNode, conf, timeoutLimit) {
   });
 
   this.saveDatabase = function(dbname, dbstring, callback) {
-      this.encryptAndStoreString(dbstring, function(error, ipfs_address) {
+      this.encryptAndStoreString(dbstring, (error, ipfs_address) => {
         if (error) {
           callback(new Error("An error was encountered loading database."));
         } else {
-          console.log("NEW BACKUP IPFS ADDRESS:", ipfs_address);
-          conf.set('db', ipfs_address);
+          this.newDBBackup(ipfs_address);
           callback(null);
         }
       });
   }
 
+
   this.loadDatabase = function(dbname, callback) {
-    console.log("CURRENT BACKUP IPFS ADDRESS:", this.conf.get('db'));
-    this.getAndDecryptString(this.conf.get('db'), function(error, decryptedFile) {
+    console.log("CURRENT BACKUP IPFS ADDRESS:", this.dbBackup);
+    this.getAndDecryptString(this.dbBackup, function(error, decryptedFile) {
       if (error) {
         callback(new Error("There was a problem loading the database"));
       } else {
@@ -48,7 +49,7 @@ function db(IPFSNode, conf, timeoutLimit) {
   }
 
   this.encryptAndStoreString = function(input_string, callback) {
-    const encrypter = new cryptr(this.conf.get('privateKey'));
+    const encrypter = new cryptr(this.privateKey);
     const encryptedString = encrypter.encrypt(input_string);
     this.IPFSNode.files.add({
       content: Buffer.from(encryptedString)
@@ -63,7 +64,7 @@ function db(IPFSNode, conf, timeoutLimit) {
 
   this.getAndDecryptString = function(ipfs_address, callback) {
     try {
-      const encrypter = new cryptr(this.conf.get('privateKey'));
+      const encrypter = new cryptr(this.privateKey);
       this.IPFSNode.pin.add(ipfs_address, (err) => {
         if (err) {
           callback(err, "");
@@ -100,10 +101,10 @@ function db(IPFSNode, conf, timeoutLimit) {
   }
 
   //TODO: FORMALIZE MESSAGES DB -> IPFS HASH:PUBLIC_KEY:URL:HOSTNAME:RATING:PROOF:TIMESTAMP
-  this.restoreDatabase = async function(callback) { //must run before starting
-
+  this.restoreDatabase = async function(dbBackup) { //must run before starting
+    this.dbBackup = dbBackup;
     let promise = new Promise((resolve, reject) => {
-      if (this.conf.has('db') == true) {
+      if (this.dbBackup != null) {
         this.lokiDB.loadDatabase({}, () => {
           resolve(true);
         });

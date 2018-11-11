@@ -1,14 +1,16 @@
-const Configstore = require('configstore');
-const pkg = require('./package.json');
-const conf = new Configstore(pkg.name);
 const chp = require('chainpoint-client');
 
 const cryptr = require('cryptr');
 const crypto2 = require('crypto2');
 
-function messages(IPFSNode, conf, timeoutLimit) {
+function messages(IPFSNode, publicKey, privateKey, messageIndex, lastIPFS, messageSentCallback, timeoutLimit) {
   this.IPFSNode = IPFSNode;
-  this.conf = conf;
+  this.publicKey = publicKey;
+  this.privateKey = privateKey;
+  this.messageIndex = messageIndex;
+  this.lastIPFS = lastIPFS;
+  this.messageSentCallback = messageSentCallback;
+
   this.timeoutLimit = timeoutLimit;
   this.storeHashInChainpoint = async function(hashToStore) {
 
@@ -62,16 +64,22 @@ function messages(IPFSNode, conf, timeoutLimit) {
   this.inProcess = false;
   this.messageQueue = [];
   this.createMessageQueue = function (url, rating) {
+    if (this.messageIndex == null) {
+      this.messageIndex = 0
+    }
+
     if (!this.inProcess) {
       console.log("Nothing in process!");
-      this.createMessage(url, rating);
+      this.createMessage(url, rating, this.messageIndex);
     } else {
       console.log("Message in Queue:", this.messageQueue.length);
-      this.messageQueue.push([url, rating]);
+      this.messageQueue.push([url, rating, this.messageIndex]);
     }
+    this.messageIndex += 1;
+    return this.messageIndex - 1;
   }
 
-  this.createMessage = async function (url, rating) {
+  this.createMessage = async function (url, rating, messageIndex) {
     /**
     {
       proof:messageProof,
@@ -90,25 +98,22 @@ function messages(IPFSNode, conf, timeoutLimit) {
 
     this.inProcess = true;
 
-    if (this.conf.has('messageIndex') == false) {
-      this.conf.set('messageIndex', 0);
-    }
+
 
     var rawPayload = {
       url:url,
       rating:rating,
-      messageIndex:this.conf.get('messageIndex')
+      messageIndex:messageIndex
     };
 
-    if (this.conf.has('lastIPFS') == true) {
-      rawPayload["lastMessageIPFS"] = this.conf.get('lastIPFS');
+    if (this.lastIPFS != null) {
+      rawPayload["lastMessageIPFS"] = this.lastIPFS;
     };
 
     const payload = JSON.stringify(rawPayload);
-    this.conf.set('messageIndex', this.conf.get('messageIndex') + 1);
     console.log("payload:", payload, "\n");
 
-    const signature = await crypto2.sign.sha256(payload, this.conf.get('privateKey'));
+    const signature = await crypto2.sign.sha256(payload, this.privateKey);
     console.log("signature:", signature, "\n");
 
     const signedPayload = JSON.stringify({signature:signature, payload:payload});
@@ -116,13 +121,13 @@ function messages(IPFSNode, conf, timeoutLimit) {
     const signedPayloadHash = await crypto2.hash.sha256(signedPayload);
     console.log("signed payload hash:", signedPayloadHash, "\n");
 
-    const isSignatureValid = await crypto2.verify.sha256(payload, this.conf.get('publicKey'), signature);
+    const isSignatureValid = await crypto2.verify.sha256(payload, this.publicKey, signature);
     console.log("signature valid:", isSignatureValid, "\n");
 
     const {proofToUse, verifiedProof} = await this.storeHashInChainpoint(signedPayloadHash);
     console.log("signed hash proof:", proofToUse, "\n");
 
-    const messageToSend = JSON.stringify({proof:proofToUse, message:{signature:signature, publicKey:this.conf.get('publicKey'), payload:payload}});
+    const messageToSend = JSON.stringify({proof:proofToUse, message:{signature:signature, publicKey:this.publicKey, payload:payload}});
     console.log("message to send:", messageToSend, "\n");
 
     // const valid_message = await this.parseMessage(messageToSend);
@@ -138,10 +143,10 @@ function messages(IPFSNode, conf, timeoutLimit) {
     });
 
     let IPFSHash = await promise;
-    this.conf.set('lastIPFS', IPFSHash);
+    this.lastIPFS = IPFSHash;
     console.log("MESSAGE IPFS:", IPFSHash);
 
-    await this.sendMessage(messageToSend);
+    await this.sendMessage(IPFSHash, messageIndex, messageToSend);
 
     var timeSinceCreation = (new Date() - new Date(verifiedProof["hashSubmittedCoreAt"]))/1000;
     var timeToWait = this.timeoutLimit - timeSinceCreation;
@@ -150,7 +155,7 @@ function messages(IPFSNode, conf, timeoutLimit) {
       if (this.messageQueue.length) {
         // pull out oldest message and process it
         var nextMessage = this.messageQueue.shift();
-        this.createMessage(nextMessage[0], nextMessage[1]);
+        this.createMessage(nextMessage[0], nextMessage[1], nextMessage[2]);
       } else {
         //in the case that there is a race condition something could sit in messaging slightly too long
         this.inProcess = false;
@@ -176,7 +181,7 @@ function messages(IPFSNode, conf, timeoutLimit) {
               const validationTime = (new Date() - new Date(recievedTime))/1000;
               console.log("Validation Time(s):", validationTime);
 
-              if (parsedMessage["message"]["publicKey"] == this.conf.get('publicKey')) {
+              if (parsedMessage["message"]["publicKey"] == this.publicKey) {
                 console.log("WARNING THIS MESSAGE FROM SELF!");
               }
               const parsedPayload = JSON.parse(parsedMessage["message"]["payload"]);
@@ -236,9 +241,10 @@ function messages(IPFSNode, conf, timeoutLimit) {
     return await promise;
   }
 
-  this.sendMessage = async function(messageToSend) {
+  this.sendMessage = async function(IPFSHash, messageIndex, messageToSend) {
     //TODO: SEND MESSAGE ON IPFS PUBSUB
-    console.log("Should send message!:", messageToSend);
+    console.log("Should send message!");
+    this.messageSentCallback(IPFSHash, messageIndex);
   }
 }
 
