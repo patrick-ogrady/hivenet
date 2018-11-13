@@ -244,7 +244,7 @@ function messages(IPFSNode, publicKey, privateKey, messageIndex, lastIPFS, messa
   this.sendMessage = async function(IPFSHash, messageIndex, messageToSend) {
     //TODO: SEND MESSAGE ON IPFS PUBSUB
     console.log("Should send message!");
-    this.messageSentCallback(IPFSHash, messageIndex);
+    this.messageSentCallback(IPFSHash, messageIndex, messageToSend);
   }
 }
 

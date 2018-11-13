@@ -34,11 +34,6 @@ const node = new IPFS({
 });
 
 
-function messageSent(IPFSHash, messageIndex) {
-
-}
-
-
 node.on('ready', async () => {
   // conf.delete('db');
   conf.delete('messageIndex');
@@ -49,7 +44,7 @@ node.on('ready', async () => {
   const {publicKey, privateKey} = await getKeys();
 
   const timeoutLimit = 60;
-  var dbObject = new db(node, privateKey, async (newBackupAddress) => {
+  var dbObject = new db(node, publicKey, privateKey, async (newBackupAddress) => {
     console.log("Database Backup:", newBackupAddress);
     //TODO: set conf for new db
     conf.set('db', newBackupAddress);
@@ -60,9 +55,19 @@ node.on('ready', async () => {
   console.log("Database Restored:",backupFound);
   await dbObject.backupDatabase();
 
-  var messagesObject = new messages(node, publicKey, privateKey, null, null, (IPFSHash, messageIndex) => {
-    console.log("Message Sent:", IPFSHash, messageIndex);
+  setInterval(async () => {
+    await dbObject.backupDatabase();
+  }, 5000); //backup db
+
+  var messagesObject = new messages(node, publicKey, privateKey, null, null, async (IPFSHash, messageIndex, messageSentText) => {
+    console.log("Message Sent:", IPFSHash, messageIndex, messageSentText);
     //TODO: set conf for new messageIndex and lastIPFS
+
+    //add messages to db for self in serial execution
+    const parsedMessage = await messagesObject.parseMessage(messageSentText);
+    console.log("Parsed Message:", parsedMessage);
+    dbObject.processMessageQueue(parsedMessage, null);
+
   }, timeoutLimit);
   messagesObject.createMessageQueue("url1", 1);
   // messagesObject.createMessageQueue("url2", 1);
@@ -70,12 +75,16 @@ node.on('ready', async () => {
   // messagesObject.createMessageQueue("url4", 1);
   // messagesObject.createMessageQueue("url5", 1);
 
+
+
   // try {
+  //
+  //   //must ensure previous message is within same public key of a recieved message
   //   let IPFSText = await messagesObject.getPreviousMessage("QmaZMQHLyZsUiZnpZ118NL3jEZas9RKSw1wvXaYdZofpVn");
   //   console.log("IPFS Text:", IPFSText);
   //   const parsedMessage = await messagesObject.parseMessage(IPFSText);
   //   console.log("Parsed Message:", parsedMessage);
-  //   dbObject.processMessageQueue(parsedMessage, false);
+  //   dbObject.processMessageQueue(parsedMessage, null);
   // } catch {
   //   console.log("Invalid Proof or IPFS Text!");
   // }

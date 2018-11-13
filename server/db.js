@@ -1,9 +1,11 @@
 // function constructor
 const loki = require('lokijs');
 const cryptr = require('cryptr');
+const jsrecommender = require("./jsrecommender");
 
-function db(IPFSNode, privateKey, dbBackedUp, timeoutLimit) {
+function db(IPFSNode, publicKey, privateKey, dbBackedUp, timeoutLimit) {
   this.IPFSNode = IPFSNode;
+  this.publicKey = publicKey
   this.privateKey = privateKey;
   this.timeoutLimit = timeoutLimit;
   this.newDBBackup = dbBackedUp;
@@ -12,6 +14,7 @@ function db(IPFSNode, privateKey, dbBackedUp, timeoutLimit) {
   this.messages = null;
   this.blacklistPeers = null;
   this.whitelist = null;
+  this.recommendations = null;
 
   this.lokiDB = new loki('sandbox', {
     adapter: {
@@ -118,7 +121,7 @@ function db(IPFSNode, privateKey, dbBackedUp, timeoutLimit) {
     this.messages = this.getCollection('messages', 'messageIPFS');
     this.blacklistPeers = this.getCollection('blacklistPeers', 'publicKey');
     this.whitelist = this.getCollection('whitelist', 'address');
-
+    this.recommendations = this.getCollection('recommendations', 'address');
     return dbExists;
 
   }
@@ -129,26 +132,159 @@ function db(IPFSNode, privateKey, dbBackedUp, timeoutLimit) {
         resolve();
       });
     });
-
   }
 
+  this.checkIfAlreadyRated = function(publicKey, url) {
+    return this.messages.chain().find({'$and': [{'url':url}, {'publicKey':publicKey}]}).data().length > 0;
+  }
+
+  this.checkIfBlacklist = function(url) {
+    return this.messages.chain().find({'$and': [{'hostname':this.extractHostname(url)}, {'publicKey':this.publicKey}]}).data().length > 0;
+  }
+
+  this.addedBlacklist = function(url) {
+    //remove hostname from whitelist
+    var whitelistSet = this.whitelist.chain().find({'hostname':this.extractHostname(url)});
+    console.log("Illegal Whitelist Found:", whitelistSet.data().length);
+    whitelistSet.remove();
+
+    //remove hostname from ratings
+    var resultSet = this.messages.chain().find({'hostname':hostname});
+
+    //get all nodes with hostname rated as 1 -> put on blacklistPeers
+    var allIllegalRatings = resultSet.data();
+    console.log("Illegal Ratings Found:", allIllegalRatings.length);
+    for (result in allIllegalRatings) {
+      if (allIllegalRatings[result].rating == 1) {
+        console.log("Adding blacklist peer:", allIllegalRatings[result].publicKey);
+        this.addBlacklistPeer(allIllegalRatings[result].publicKey);
+      }
+    }
+
+    resultSet.remove();
+  }
+
+  //WHITELIST
+  this.addWhitelist = function(url) {
+    if (this.checkIfBlacklist(url) == false) {
+      try {
+        this.whitelist.insert({
+          address:url,
+          hostname:this.extractHostname(url)
+        });
+      } catch (error) {
+        console.log("Can't add to whitelist!", error);
+      }
+    } else {
+      console.log("Didn't add whitelist because in blacklist!");
+    }
+  }
+
+
+  //DB OPS
+  this.addBlacklistPeer = function(publicKey) { //added unique specifier
+    try {
+      this.blacklistPeers.insert({
+        publicKey:publicKey
+      });
+
+      //remove all messages from peer
+      this.messages.chain().find({'publicKey' : publicKey}).remove();
+    } catch (error) {
+      console.log("Can't add to blacklistPeers!", error);
+    }
+  }
+
+  this.checkBlacklistPeer = function(publicKey) {
+    return this.blacklistPeers.chain().find({'publicKey' : publicKey}).data().length > 0;
+  }
+
+  this.checkMessageIPFS = function(messageIPFS) {
+    return this.messages.chain().find({'messageIPFS' : messageIPFS}).data().length > 0;
+  }
+
+  this.checkMessageIndex = function(messageIndex) {
+    return this.messages.chain().find({'messageIndex' : messageIndex}).data().length > 0;
+  }
+
+  this.getMessageDifference = function(publicKey, creationTime) {
+    var maxTime = (new Date(new Date(creationTime) + 1000 * this.timeoutLimit)).toISOString();
+    var minTime = (new Date(new Date(creationTime) - 1000 * this.timeoutLimit)).toISOString();
+    return this.messages.chain().find({'$and': [{ count : { '$between': [maxTime, minTime] }}, {'publicKey':publicKey}]}).data().length > 0;
+  }
+
+
+
+  this.extractHostname = function(url) {
+      var hostname;
+      //find & remove protocol (http, ftp, etc.) and get hostname
+
+      if (url.indexOf("//") > -1) {
+          hostname = url.split('/')[2];
+      }
+      else {
+          hostname = url.split('/')[0];
+      }
+
+      //find & remove port number
+      hostname = hostname.split(':')[0];
+      //find & remove "?"
+      hostname = hostname.split('?')[0];
+
+      return hostname;
+  }
+
+  this.addMessage = function(message) {
+    try {
+      // {
+      //   creationTime,
+      //   recievedTime,
+      //   publicKey,
+      //   rating,
+      //   url,
+      //   messageIndex,
+      //   messageIPFS,
+      //   lastMessageIPFS (optional)
+      // };
+      this.messages.insert({
+        publicKey:message.publicKey,
+        creationTime:message.creationTime,
+        rating:message.rating,
+        url:message.url,
+        hostname:this.extractHostname(message.url),
+        messageIndex:message.messageIndex,
+        messageIPFS:message.messageIPFS
+      });
+    } catch (error) {
+      console.log("Can't add to messages!", error);
+    }
+  }
 
   //TODO: SERIAL EVENT PROCESSING: https://stackoverflow.com/questions/39044183/serially-processing-a-queue-of-messages-whose-processing-is-async
   this.inProcess = false;
   this.messageQueue = [];
 
-  //message passed in should already be parsed...just adding
-  this.processMessageQueue = function(message, historicalMessage) {
-    //historical message is a boolean indicating if older message
-    if (!this.inProcess) {
-      console.log("Nothing in process!");
-      this.processMessage(message, historicalMessage);
-    } else {
-      console.log("Message in Queue:", this.messageQueue.length);
-      this.messageQueue.push([message, historicalMessage]);
+  this.attemptPreviousMessage = async function(historicalPublicKey, IPFSaddress) {
+    if(this.checkMessageIPFS(IPFSaddress) == false) {
+      let IPFSText = await messagesObject.getPreviousMessage(IPFSaddress);
+      console.log("PREVIOUS IPFS Text:", IPFSText);
+      const parsedMessage = await messagesObject.parseMessage(IPFSText);
+      console.log("PREVIOUS Parsed Message:", parsedMessage);
+      this.processMessageQueue(parsedMessage, historicalPublicKey);
     }
   }
 
+  //message passed in should already be parsed...just adding
+  this.processMessageQueue = function(message, historicalPublicKey) {
+    //historical message is a boolean indicating if older message
+    if (!this.inProcess) {
+      console.log("Nothing in process!");
+      this.processMessage(message, historicalPublicKey);
+    } else {
+      console.log("Message in Queue:", this.messageQueue.length);
+      this.messageQueue.push([message, historicalPublicKey]);
+    }
+  }
 
   this.endProcessMessage = function() { //used as a return function if stop early
     if (this.messageQueue.length) {
@@ -161,7 +297,7 @@ function db(IPFSNode, privateKey, dbBackedUp, timeoutLimit) {
     }
   }
 
-  this.processMessage = function(message, historicalMessage) { //input message should not be a IPFS address (otherwise would have to poll IPFS for every incoming message)
+  this.processMessage = function(message, historicalPublicKey) { //input message should not be a IPFS address (otherwise would have to poll IPFS for every incoming message)
     this.inProcess = true;
 
     /** message should be an already validated dictionary object returned from messages.parseMessage
@@ -177,51 +313,216 @@ function db(IPFSNode, privateKey, dbBackedUp, timeoutLimit) {
     };
     **/
 
-    if (historicalMessage == false) {
-      var oldness = (new Date(message.recievedTime) - new Date(message.creationTime))/1000;
-      if (oldness > this.timeoutLimit) {
-        console.log("DROPPING MESSAGE FOR TIMEOUT:", message.messageIPFS, oldness);
+    //check if already rated
+    if (this.checkIfAlreadyRated(message.publicKey, message.url)) {
+      console.log("ALREADY RATED CONTENT!", message.publicKey, message.url);
+      this.endProcessMessage();
+      return;
+    }
+
+    if (message.publicKey != this.publicKey) {
+      //check if creationTime is within Y seconds of recievedTime (unless processing a chain)
+        //drop message
+      if (historicalPublicKey == null) {
+        var oldness = (new Date(message.recievedTime) - new Date(message.creationTime))/1000;
+        if (oldness > this.timeoutLimit) {
+          console.log("DROPPING MESSAGE FOR TIMEOUT:", message.messageIPFS, oldness);
+          this.endProcessMessage();
+          return;
+        }
+      } else {
+        //ensure parent message has same public key that provided, otherwise blacklist
+        if (historicalPublicKey != message.publicKey) {
+          this.addBlacklistPeer(historicalPublicKey);
+          console.log("HISTORICAL PUBLIC KEY IMPERSONATOR:", historicalPublicKey, message.publicKey);
+          this.endProcessMessage();
+          return;
+        }
+      }
+
+      //check if publicKey in blacklistPeers
+        //drop message
+      if (this.checkBlacklistPeer(message.publicKey)) {
+        console.log("DROPPING MESSAGE FOR BLACKLIST PEER:", message.publicKey);
         this.endProcessMessage();
         return;
       }
+
+      //check if messageIPFS already stored in messages
+        //drop message
+      if (this.checkMessageIPFS(message.messageIPFS)) {
+        console.log("DROPPING MESSAGE AS REPEAT:", message.messageIPFS);
+        this.endProcessMessage();
+        return;
+      }
+
+      //check if messageIndex for publicKey already stored
+        //blacklist -> personal fork detected
+      if (this.checkMessageIndex(message.messageIndex)) {
+        console.log("DROPPING MESSAGE AS REPEAT INDEX AND BLACKLISTING PEER FOR FORK:", message.messageIndex, message.publicKey);
+        this.addBlacklistPeer(message.publicKey);
+        this.endProcessMessage();
+        return;
+      }
+
+      //check if rated 1 and on blacklist -> blacklist peer
+      if (message.rating == 1 && this.checkIfBlacklist(message.url)) {
+        console.log("DROPPING MESSAGE AS BLACKLISTED AND BLACKLISTING PEER FOR MALICIOUS CONTENT DISTRIBUTION:", message.messageIndex, message.publicKey);
+        this.addBlacklistPeer(message.publicKey);
+        this.endProcessMessage();
+        return;
+      }
+
+      //check if message history now means that two messages were proof marked
+      //less than X seconds apart
+        //blacklist -> attack detected
+      //get message within timeout of rating
+      if (this.getMessageDifference(message.publicKey, message.creationTime)) {
+        console.log("DROPPING MESSAGE AS TOO FREQUENT AND BLACKLISTING PEER FOR DOS:", message.messageIndex, message.publicKey);
+        this.addBlacklistPeer(message.publicKey);
+        this.endProcessMessage();
+        return;
+      };
+
+      //attempt previous message fetch
+      if (message.lastIPFS) {
+        this.attemptPreviousMessage(message.publicKey, message.lastIPFS);
+      }
+
+      //addToDB
+      this.addMessage(message);
+
+      //Broadcast (unless processing a chain...would get dropped by other clients because old message)
+      if (historicalPublicKey == null) {
+        //broadcast
+        console.log("SHOULD REBROADCAST:", message)
+      }
+    } else { //means that we sent
+      console.log("MESSAGE FROM SELF!!!");
+      //addToDB
+      this.addMessage(message);
+
+      //if message rating == -1: added to blacklist (need to remove from whitelist and all nodes that rated as 1)
+      if (message.rating == -1) {
+        this.addedBlacklist(message.url);
+      }
+
     }
 
-    //check if creationTime is within Y seconds of recievedTime (unless processing a chain)
-      //drop message
+    console.log("All messages:", this.messages.chain().data());
 
-    //check if publicKey in blacklistPeers
-      //drop message
-
-    //check if messageIPFS already stored in messages
-      //drop message
-
-    //check if messageIndex for publicKey already stored
-      //blacklist -> personal fork detected
-
-    //check if message history now means that two messages were proof marked
-    //less than X seconds apart
-      //blacklist -> attack detected
-
-    //addToDB
-
-    //Broadcast (unless processing a chain...would get dropped by other clients because old message)
-
-
-
-    //mirror processing
-    setTimeout(() => {
-      console.log(message);
-      //code to be executed after 10 second
-      // see if anything else is in the queue to process
-      this.endProcessMessage();
-
-    }, 1000 * 3);
-
-    //mark complete
-
-
+    this.endProcessMessage();
+    return;
   }
 
+  //UNSEEN RISK SCORE
+
+  this.getOldestSeen = function(address) {
+    var resultSetData = this.messages.chain().find({'address':address}).simplesort('creationTime').limit(1).data();
+    if (resultSetData.length > 0) {
+      return resultSetData[0];
+    } else {
+      return null;
+    }
+  }
+
+  this.getUserCountOldestRatedAddresses = function() {
+    //get oldest ratings for all ratings = 1 by self
+    var allPublicKeyRatings = this.messages.chain().find({'publicKey':this.publicKey}).data();
+    var allCount = {};
+    for (rating in allPublicKeyRatings) {
+      var oldestSeenRating = this.getOldestSeen(allPublicKeyRatings[rating].address);
+      console.log(oldestSeenRating.publicKey, oldestSeenRating.address, oldestSeenRating.creationTime);
+      if (oldestSeenRating.publicKey == this.publicKey) {
+        //self
+        continue;
+      }
+      if (!allCount[oldestSeenRating.publicKey]) {
+        allCount[oldestSeenRating.publicKey] = 0
+      }
+      allCount[oldestSeenRating.publicKey] += 1
+    }
+
+    return allCount;
+  }
+
+  this.getNewAddressRisk = function(hostname) {
+    const userCounts = this.getUserCountOldestRatedAddresses();
+    var totalPoints = 0;
+    var totalScore = 0;
+    for (userPublicKey in userCounts) {
+      var result = this.messages.chain().find({'$and': [{'publicKey' : userPublicKey},{'hostname' : hostname}, {'rating' : -1}]}).data()
+      if (result.length > 0) {
+        totalScore += userCounts[userPublicKey];
+      }
+      totalPoints += userCounts[userPublicKey];
+    }
+
+    return totalScore/totalPoints;
+  }
+
+  //GET RECOMMENDATION
+  this.getUniqueWhitelistHostnames = function() {
+    var result = this.whitelist.mapReduce(function(obj) {
+    	return obj.hostname;
+    }, function(arr) {
+    	var ret = [], len = arr.length;
+        for(var i = 0; i < len; i++) {
+            if(ret.indexOf(arr[i]) === -1) {
+                ret.push(arr[i]);
+            }
+        }
+        return ret;
+    });
+    return result;
+  }
+
+
+
+  this.getRatingsForHostnames = function(hostnames) {
+    return this.messages.find({ 'hostname' : { '$in' : hostnames } })
+  }
+
+  function calculateRecommendations(publicKey) {
+    this.recommendations.chain().remove()
+    var allUniqueHostnames = this.getUniqueWhitelistHostnames();
+
+    var applicableRatings = this.getRatingsForHostnames(allUniqueHostnames);
+
+    var recommender = new jsrecommender.Recommender();
+    var table = new jsrecommender.Table();
+
+    for (rating in applicableRatings) {
+      var thisRating = applicableRatings[rating];
+      table.setCell(thisRating.address, thisRating.publicKey, thisRating.rating);
+    }
+
+    var model = recommender.fit(table);
+
+    var predicted_table = recommender.transform(table);
+    var urls_to_view = [];
+
+    for (var j = 0; j < predicted_table.rowNames.length; ++j) {
+      var url_string = predicted_table.rowNames[j];
+      if (table.containsCell(url_string, this.publicKey) == false) {
+        recommendations.insert({
+          address:url_string,
+          score:predicted_table.getCell(url_string, this.publicKey)
+        });
+      }
+    }
+  }
+
+  this.getRecommendation = function() {
+    var resultSet = this.recommendations.chain().simplesort('score').limit(1);
+    var resultSetData = resultSet.data();
+    if (resultSetData.length > 0) {
+      resultSet.remove()
+      return resultSetData[0];
+    } else {
+      return null;
+    }
+  }
 }
 
 module.exports = db;
