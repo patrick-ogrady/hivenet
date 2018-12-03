@@ -282,6 +282,7 @@ function addToRatings(publicKey, urlFullAddress, rating) {
 
 }
 
+//TODO: store whitelist url and discard if marked as blacklist...otherwise save to whitelist when next whitelist item processed
 function addToWhitelists(urlFullAddress, urlHostname) {
   if (blacklistHostnames.has(urlHostname)) {
     console.log("did not add to whitelist because already blacklisted!");

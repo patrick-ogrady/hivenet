@@ -3,7 +3,7 @@ const loki = require('lokijs');
 const cryptr = require('cryptr');
 const jsrecommender = require("./jsrecommender");
 
-function db(IPFSNode, publicKey, privateKey, dbBackedUp, timeoutLimit) {
+function db(IPFSNode, publicKey, privateKey, dbBackedUp) {
   this.IPFSNode = IPFSNode;
   this.publicKey = publicKey
   this.privateKey = privateKey;
@@ -13,7 +13,6 @@ function db(IPFSNode, publicKey, privateKey, dbBackedUp, timeoutLimit) {
   //DB COLLECTIONS
   this.messages = null;
   this.blacklistPeers = null;
-  this.whitelist = null;
   this.recommendations = null;
 
   this.lokiDB = new loki('sandbox', {
@@ -120,7 +119,6 @@ function db(IPFSNode, publicKey, privateKey, dbBackedUp, timeoutLimit) {
 
     this.messages = this.getCollection('messages', 'messageIPFS');
     this.blacklistPeers = this.getCollection('blacklistPeers', 'publicKey');
-    this.whitelist = this.getCollection('whitelist', 'address');
     this.recommendations = this.getCollection('recommendations', 'address');
     return dbExists;
 
@@ -138,47 +136,7 @@ function db(IPFSNode, publicKey, privateKey, dbBackedUp, timeoutLimit) {
     return this.messages.chain().find({'$and': [{'url':url}, {'publicKey':publicKey}]}).data().length > 0;
   }
 
-  this.checkIfBlacklist = function(url) {
-    return this.messages.chain().find({'$and': [{'hostname':this.extractHostname(url)}, {'publicKey':this.publicKey}]}).data().length > 0;
-  }
 
-  this.addedBlacklist = function(url) {
-    //remove hostname from whitelist
-    var whitelistSet = this.whitelist.chain().find({'hostname':this.extractHostname(url)});
-    console.log("Illegal Whitelist Found:", whitelistSet.data().length);
-    whitelistSet.remove();
-
-    //remove hostname from ratings
-    var resultSet = this.messages.chain().find({'hostname':hostname});
-
-    //get all nodes with hostname rated as 1 -> put on blacklistPeers
-    var allIllegalRatings = resultSet.data();
-    console.log("Illegal Ratings Found:", allIllegalRatings.length);
-    for (result in allIllegalRatings) {
-      if (allIllegalRatings[result].rating == 1) {
-        console.log("Adding blacklist peer:", allIllegalRatings[result].publicKey);
-        this.addBlacklistPeer(allIllegalRatings[result].publicKey);
-      }
-    }
-
-    resultSet.remove();
-  }
-
-  //WHITELIST
-  this.addWhitelist = function(url) {
-    if (this.checkIfBlacklist(url) == false) {
-      try {
-        this.whitelist.insert({
-          address:url,
-          hostname:this.extractHostname(url)
-        });
-      } catch (error) {
-        console.log("Can't add to whitelist!", error);
-      }
-    } else {
-      console.log("Didn't add whitelist because in blacklist!");
-    }
-  }
 
 
   //DB OPS
@@ -203,56 +161,19 @@ function db(IPFSNode, publicKey, privateKey, dbBackedUp, timeoutLimit) {
     return this.messages.chain().find({'messageIPFS' : messageIPFS}).data().length > 0;
   }
 
-  this.checkMessageIndex = function(messageIndex) {
-    return this.messages.chain().find({'messageIndex' : messageIndex}).data().length > 0;
-  }
 
-  this.getMessageDifference = function(publicKey, creationTime) {
-    var maxTime = (new Date(new Date(creationTime) + 1000 * this.timeoutLimit)).toISOString();
-    var minTime = (new Date(new Date(creationTime) - 1000 * this.timeoutLimit)).toISOString();
-    return this.messages.chain().find({'$and': [{ count : { '$between': [maxTime, minTime] }}, {'publicKey':publicKey}]}).data().length > 0;
-  }
-
-
-
-  this.extractHostname = function(url) {
-      var hostname;
-      //find & remove protocol (http, ftp, etc.) and get hostname
-
-      if (url.indexOf("//") > -1) {
-          hostname = url.split('/')[2];
-      }
-      else {
-          hostname = url.split('/')[0];
-      }
-
-      //find & remove port number
-      hostname = hostname.split(':')[0];
-      //find & remove "?"
-      hostname = hostname.split('?')[0];
-
-      return hostname;
+  this.cleanURL = function(url) {
+    return url;
   }
 
   this.addMessage = function(message) {
     try {
-      // {
-      //   creationTime,
-      //   recievedTime,
-      //   publicKey,
-      //   rating,
-      //   url,
-      //   messageIndex,
-      //   messageIPFS,
-      //   lastMessageIPFS (optional)
-      // };
+      //don't store work or proof in DB
       this.messages.insert({
         publicKey:message.publicKey,
         creationTime:message.creationTime,
         rating:message.rating,
         url:message.url,
-        hostname:this.extractHostname(message.url),
-        messageIndex:message.messageIndex,
         messageIPFS:message.messageIPFS
       });
     } catch (error) {
@@ -408,6 +329,8 @@ function db(IPFSNode, publicKey, privateKey, dbBackedUp, timeoutLimit) {
       }
 
     }
+
+    //TODO: only rebroadcast if on whitelist (maybe?)
 
     console.log("All messages:", this.messages.chain().data());
 

@@ -3,15 +3,14 @@ const chp = require('chainpoint-client');
 const cryptr = require('cryptr');
 const crypto2 = require('crypto2');
 
-function messages(IPFSNode, publicKey, privateKey, messageIndex, lastIPFS, messageSentCallback, timeoutLimit) {
+function messages(IPFSNode, publicKey, privateKey, lastIPFS, messageSentCallback) {
   this.IPFSNode = IPFSNode;
   this.publicKey = publicKey;
   this.privateKey = privateKey;
-  this.messageIndex = messageIndex;
   this.lastIPFS = lastIPFS;
+  this.numZeros = 25;
   this.messageSentCallback = messageSentCallback;
 
-  this.timeoutLimit = timeoutLimit;
   this.storeHashInChainpoint = async function(hashToStore) {
 
     // Submit each hash to three randomly selected Nodes
@@ -79,6 +78,11 @@ function messages(IPFSNode, publicKey, privateKey, messageIndex, lastIPFS, messa
     return this.messageIndex - 1;
   }
 
+  this.calculateNonce = async function (proofHash) {
+
+    const hash = await crypto2.hash.sha256(proofHash + );
+  }
+
   this.createMessage = async function (url, rating, messageIndex) {
     /**
     {
@@ -127,11 +131,10 @@ function messages(IPFSNode, publicKey, privateKey, messageIndex, lastIPFS, messa
     const {proofToUse, verifiedProof} = await this.storeHashInChainpoint(signedPayloadHash);
     console.log("signed hash proof:", proofToUse, "\n");
 
+    //calculate nonce
+
     const messageToSend = JSON.stringify({proof:proofToUse, message:{signature:signature, publicKey:this.publicKey, payload:payload}});
     console.log("message to send:", messageToSend, "\n");
-
-    // const valid_message = await this.parseMessage(messageToSend);
-    // console.log("Valid Message:", valid_message);
 
     //add to ipfs
     let promise = new Promise((resolve, reject) => {
