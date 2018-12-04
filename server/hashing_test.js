@@ -5,14 +5,8 @@ const bigInt = require("big-integer");
 const IPFS = require('ipfs');
 const simpledb = require('./simpledb.js');
 
+const setting = "TEST";
 
-async function createKeys() {
-  console.log("CREATING KEY PAIRS");
-  const { privateKey, publicKey } = await crypto2.createKeyPair();
-  console.log("Public Key:", publicKey, "\n");
-
-  return {publicKey:publicKey, privateKey:privateKey};
-}
 
 async function storeString(IPFSNode, inputString) {
   let promise = new Promise((resolve, reject) => {
@@ -24,7 +18,7 @@ async function storeString(IPFSNode, inputString) {
   });
 
   let IPFSHash = await promise;
-  console.log("MESSAGE IPFS:", IPFSHash);
+  // console.log("MESSAGE IPFS:", IPFSHash);
   return IPFSHash;
 }
 
@@ -73,54 +67,66 @@ async function getAndDecryptString(IPFSNode, ipfsAddress, publicKey, privateKey)
   }
 }
 
+var fakeChainpointProofs = [];
+
 async function storeHashInChainpoint(hashToStore) {
+  if (setting == "PROD") {
+    // Submit each hash to three randomly selected Nodes
+    let proofHandles = await chp.submitHashes([hashToStore]);
+    // console.log("Submitted Proof Objects: Expand objects below to inspect.")
+    // console.log(proofHandles)
 
-  // Submit each hash to three randomly selected Nodes
-  let proofHandles = await chp.submitHashes([hashToStore]);
-  console.log("Submitted Proof Objects: Expand objects below to inspect.")
-  console.log(proofHandles)
+    // Wait for Calendar proofs to be available
+    // console.log("Sleeping 20 seconds to wait for proofs to generate...")
+    await new Promise(resolve => setTimeout(resolve, 20000))
 
-  // Wait for Calendar proofs to be available
-  console.log("Sleeping 20 seconds to wait for proofs to generate...")
-  await new Promise(resolve => setTimeout(resolve, 20000))
+    // Retrieve a Calendar proof for each hash that was submitted
+    let proofs = await chp.getProofs(proofHandles)
+    // console.log("Proof Objects: Expand objects below to inspect.")
+    // console.log(proofs)
 
-  // Retrieve a Calendar proof for each hash that was submitted
-  let proofs = await chp.getProofs(proofHandles)
-  console.log("Proof Objects: Expand objects below to inspect.")
-  console.log(proofs)
-
-  let proofToUse = null;
-  for (i in proofs) {
-    if (proofs[i].proof != null) {
-      proofToUse = proofs[i].proof;
-      break
+    let proofToUse = null;
+    for (i in proofs) {
+      if (proofs[i].proof != null) {
+        proofToUse = proofs[i].proof;
+        break
+      }
     }
+
+    // console.log("Single Proof Selected")
+    // console.log(proofToUse);
+
+    // Verify every anchor in every Calendar proof
+    let verifiedProofs = await chp.verifyProofs([proofToUse])
+    // console.log("Verified Proof Objects: Expand objects below to inspect.")
+    // console.log(verifiedProofs)
+
+    //different nodes return different proofs however all have same anchor id
+    return {proofToUse:proofToUse, verifiedProof:verifiedProofs[0]};
+  } else {
+    fakeChainpointProofs.push({
+      "hashSubmittedCoreAt":(new Date()).toISOString(),
+      "hash":hashToStore
+    })
+    return {proofToUse:(fakeChainpointProofs.length - 1).toString(), verifiedProof:"YYY"};
   }
-
-  console.log("Single Proof Selected")
-  console.log(proofToUse);
-
-  // Verify every anchor in every Calendar proof
-  let verifiedProofs = await chp.verifyProofs([proofToUse])
-  console.log("Verified Proof Objects: Expand objects below to inspect.")
-  console.log(verifiedProofs)
-
-  //different nodes return different proofs however all have same anchor id
-  return {proofToUse:proofToUse, verifiedProof:verifiedProofs[0]};
-
 }
 
 async function verifyProofInChainpoint(proof) {
-    let verifiedProofs = await chp.verifyProofs([proof])
-    console.log("Verified Proof Objects: Expand objects below to inspect.")
-    console.log(verifiedProofs)
+    if (setting == "PROD") {
+      let verifiedProofs = await chp.verifyProofs([proof])
+      // console.log("Verified Proof Objects: Expand objects below to inspect.")
+      // console.log(verifiedProofs)
 
-    if (verifiedProofs.length > 0) {
-      return verifiedProofs[0];
+      if (verifiedProofs.length > 0) {
+        return verifiedProofs[0];
+      } else {
+        return null;
+      }
     } else {
-      return null;
+      return fakeChainpointProofs[parseInt(proof)];
     }
-  }
+}
 
 async function findNonce(proofHash) {
   const difficulty = 5;
@@ -135,7 +141,7 @@ async function findNonce(proofHash) {
         var end = new Date().getTime();
         var time = (end - start);
         if (time > 0) {
-          console.log("***FINISHED***","Current Nonce:", nonce.toString(), "Best Leading Zeros:", bestLeadingZeros, "Time Elapsed:", time/1000, "Hash/s:", nonce.divide(time).multiply(1000).toString());
+          // console.log("***FINISHED***","Current Nonce:", nonce.toString(), "Best Leading Zeros:", bestLeadingZeros, "Time Elapsed:", time/1000, "Hash/s:", nonce.divide(time).multiply(1000).toString());
         }
         break;
       }
@@ -144,7 +150,7 @@ async function findNonce(proofHash) {
       var end = new Date().getTime();
       var time = (end - start);
       if (time > 0) {
-        console.log("Current Nonce:", nonce.toString(), "Best Leading Zeros:", bestLeadingZeros, "Time Elapsed:", time/1000, "Hash/s:", nonce.divide(time).multiply(1000).toString());
+        // console.log("Current Nonce:", nonce.toString(), "Best Leading Zeros:", bestLeadingZeros, "Time Elapsed:", time/1000, "Hash/s:", nonce.divide(time).multiply(1000).toString());
       }
 
     }
@@ -188,42 +194,42 @@ async function createMessage(IPFSNode, url, rating, lastMessageIPFS, publicKey, 
   };
 
   if (lastMessageIPFS != null) {
-    console.log("Last Message IPFS:", lastMessageIPFS);
+    // console.log("Last Message IPFS:", lastMessageIPFS);
     rawPayload["lastMessageIPFS"] = lastMessageIPFS;
   } else {
-    console.log("Last Message IPFS:", null);
+    // console.log("Last Message IPFS:", null);
   }
 
   const payload = JSON.stringify(rawPayload);
-  console.log("payload:", payload, "\n");
+  // console.log("payload:", payload, "\n");
 
   const signature = await crypto2.sign.sha256(payload, privateKey);
-  console.log("signature:", signature, "\n");
+  // console.log("signature:", signature, "\n");
 
   const signedPayload = JSON.stringify({signature:signature, payload:payload});
 
   const signedPayloadHash = await crypto2.hash.sha256(signedPayload);
-  console.log("signed payload hash:", signedPayloadHash, "\n");
+  // console.log("signed payload hash:", signedPayloadHash, "\n");
 
   const isSignatureValid = await crypto2.verify.sha256(payload, publicKey, signature);
-  console.log("signature valid:", isSignatureValid, "\n");
+  // console.log("signature valid:", isSignatureValid, "\n");
 
   const {proofToUse, verifiedProof} = await storeHashInChainpoint(signedPayloadHash);
-  console.log("signed hash proof:", proofToUse, "\n");
+  // console.log("signed hash proof:", proofToUse, "\n");
 
   //calculate nonce
   const proofHash = await crypto2.hash.sha256(proofToUse);
-  console.log("Finding Nonce for:", proofHash);
+  // console.log("Finding Nonce for:", proofHash);
   const nonce = await findNonce(proofHash);
-  console.log("Hash Leading Zeros", proofHash, await checkNonce(proofHash, nonce));
+  // console.log("Hash Leading Zeros", proofHash, await checkNonce(proofHash, nonce));
 
   const messageToSend = JSON.stringify({proof:proofToUse, nonce:nonce, message:{signature:signature, publicKey:publicKey, payload:payload}});
-  console.log("message to send:", messageToSend, "\n");
+  // console.log("message to send:", messageToSend, "\n");
 
   let IPFSHash = await storeString(IPFSNode, messageToSend);
-  console.log("MESSAGE IPFS:", IPFSHash);
+  // console.log("MESSAGE IPFS:", IPFSHash);
 
-  return IPFSHash;
+  return {IPFSHash: IPFSHash, messageContents:messageToSend};
 
 }
 
@@ -236,22 +242,21 @@ async function blacklistPeer(publicKey) {
 async function parseMessage(messageIPFS, recievedMessage) { //returns null if not valid
   const difficulty = 5;
   const parsedMessage = JSON.parse(recievedMessage);
-
   //check if valid signature (then can blacklist for errors)
   var validPublicKey = null;
   if ("message" in parsedMessage) {
     if ("signature" in parsedMessage["message"] && "publicKey" in parsedMessage["message"] && "payload" in parsedMessage["message"]) {
       const isSignatureValid = await crypto2.verify.sha256(parsedMessage["message"]["payload"], parsedMessage["message"]["publicKey"], parsedMessage["message"]["signature"]);
       if (isSignatureValid == true) {
-        console.log("valid signature!")
+        // console.log("valid signature!")
         validPublicKey = parsedMessage["message"]["publicKey"];
       } else {
         console.log("invalid signature");
-        return null;
+        return {shouldBlacklist:null, parsedMessage:null};
       }
     } else {
       console.log("invalid signature");
-      return null;
+      return {shouldBlacklist:null, parsedMessage:null};
     }
   }
 
@@ -265,21 +270,18 @@ async function parseMessage(messageIPFS, recievedMessage) { //returns null if no
       const signedPayloadHash = await crypto2.hash.sha256(signedPayload);
       if (verifiedProof["hash"] != signedPayloadHash) {
         console.log("proof does not match message!");
-        blacklistPeer(validPublicKey);
-        return null;
+        return {shouldBlacklist:validPublicKey, parsedMessage:null};
       } else {
-        console.log("valid proof!");
+        // console.log("valid proof!");
         creationTime = verifiedProof["hashSubmittedCoreAt"];
       }
     } else {
       console.log("invalid proof");
-      blacklistPeer(validPublicKey);
-      return null;
+      return {shouldBlacklist:validPublicKey, parsedMessage:null};
     }
   } else {
     console.log("No proof!");
-    blacklistPeer(validPublicKey);
-    return null;
+    return {shouldBlacklist:validPublicKey, parsedMessage:null};
   }
 
   //check that nonce is valid
@@ -288,10 +290,9 @@ async function parseMessage(messageIPFS, recievedMessage) { //returns null if no
     const leadingZeros = await checkNonce(proofHash, parsedMessage["nonce"]);
     if (leadingZeros < difficulty) {
       console.log("Invalid nonce!");
-      blacklistPeer(validPublicKey);
-      return null;
+      return {shouldBlacklist:validPublicKey, parsedMessage:null};
     } else {
-      console.log("Valid nonce!");
+      // console.log("Valid nonce!");
     }
   }
 
@@ -309,84 +310,144 @@ async function parseMessage(messageIPFS, recievedMessage) { //returns null if no
     toReturn["lastMessageIPFS"] = "<none>";
   }
 
-  console.log("Parsed Message:", toReturn);
-  return toReturn;
+  // console.log("Parsed Message:", toReturn);
+  return {shouldBlacklist:null, parsedMessage:toReturn};
+}
+
+const agent = require("./agent.js");
+async function createAgent() {
+  var agentInstance = new agent();
+  await agentInstance.initialize();
+  return agentInstance;
 }
 
 async function performTest(IPFSNode) {
-  // var urlsToRate = [
-  //   "https://en.bitcoin.it/wiki/Hashcash",
-  //   "https://security.stackexchange.com/questions/14262/hashcash-is-this-really-used",
-  //   "https://www.cnn.com/2018/12/03/politics/trump-bush-political-unity/index.html",
-  //   "https://www.cnn.com/2018/12/03/politics/george-hw-bush-eulogy-funeral-plans/index.html",
-  //   "https://bleacherreport.com/articles/2808828-kareem-hunt-admits-lying-to-chiefs-apologizes-in-nfl-countdown-interview?utm_source=cnn.com&utm_medium=referral&utm_campaign=editorial"
-  // ];
 
-  var urlsToRate = [
-    "https://bleacherreport.com/articles/2808828-kareem-hunt-admits-lying-to-chiefs-apologizes-in-nfl-countdown-interview?utm_source=cnn.com&utm_medium=referral&utm_campaign=editorial",
-    "https://security.stackexchange.com/questions/14262/hashcash-is-this-really-used"
-  ];
+  var agents = [];
+  const numAgents = 10;
+  var i;
+  for (i = 0; i < numAgents; i++) {
+    console.log("Agent:", i)
+    var thisAgent = await createAgent();
+    console.log(thisAgent.publicKey);
+    agents.push(thisAgent);
+  }
 
-  // var urlsToRate = [
-  //   "https://bleacherreport.com/articles/2808828-kareem-hunt-admits-lying-to-chiefs-apologizes-in-nfl-countdown-interview?utm_source=cnn.com&utm_medium=referral&utm_campaign=editorial",
-  // ];
 
-  var {publicKey, privateKey} = await createKeys();
-  var myDB = new simpledb();
-
-  //CREATE VALID MESSAGES
-  var lastMessageIPFS = null;
+  //simulate 10 rounds
+  //can choose to send (be honest or malicious) or not
+  //probability that any agent is chosen to process messages created in round
   var createdMessages = [];
-  var i;
-  for (i = 0; i < urlsToRate.length; i++) {
-    console.log(myDB.getOldestSeen(urlsToRate[i]));
-    let thisMessageIPFS = await createMessage(IPFSNode, urlsToRate[i], 1, lastMessageIPFS, publicKey, privateKey);
-    createdMessages.push(thisMessageIPFS);
-    lastMessageIPFS = thisMessageIPFS;
-  }
+  var y = 0;
+  while (true) {
+    var i;
+    for (i = 0; i < agents.length; i++) {
+      var urlToSend = agents[i].getRandomURL();
+      var ratingToGive = agents[i].getRating();
+      if (urlToSend != null) {
+        if (agents[i].db.checkIfAlreadyRated(agents[i].publicKey, urlToSend)) {
+          continue;
+        }
 
-  //RECIEVE MESSAGES
-  var i;
-  for (i = 0; i < createdMessages.length; i++) {
-    //check DB to make sure not already contains before doing work
-    let fileContents = await getString(IPFSNode, createdMessages[i]);
-    console.log(createdMessages[i], fileContents);
-    let parsedMessage = await parseMessage(createdMessages[i], fileContents);
-    if (parsedMessage != null) {
-      console.log("Message Add Response:", myDB.addMessage(parsedMessage));
+        console.log("Agent:", i, urlToSend, "Rating:", ratingToGive, "Risk Score:", agents[i].db.getURLRiskScore(agents[i].publicKey, urlToSend));
+
+
+        const {IPFSHash, messageContents} = await createMessage(IPFSNode, urlToSend, ratingToGive, agents[i].lastMessageIPFS, agents[i].publicKey, agents[i].privateKey);
+        agents[i].lastMessageIPFS = IPFSHash;
+        const {shouldBlacklist, parsedMessage} = await parseMessage(IPFSHash, messageContents); //should never be blacklist for self
+        agents[i].db.addMessage(parsedMessage);
+
+        createdMessages.push([IPFSHash, messageContents]); //broadcast
+      }
     }
-  }
-
-  //CREATE NEW IDENTITY AND RATE SAME AS ORIGINAL
-  var {publicKey, privateKey} = await createKeys();
-
-  //ADD TO DB
-  var lastMessageIPFS = null;
-  var createdMessages = [];
-  var i;
-  for (i = 0; i < urlsToRate.length; i++) {
-    console.log(myDB.getOldestSeen(urlsToRate[i]));
-    let thisMessageIPFS = await createMessage(IPFSNode, urlsToRate[i], 1, lastMessageIPFS, publicKey, privateKey);
-    createdMessages.push(thisMessageIPFS);
-    lastMessageIPFS = thisMessageIPFS;
-    break;
-  }
-
-  var i;
-  for (i = 0; i < createdMessages.length; i++) {
-    //check DB to make sure not already contains before doing work
-    let fileContents = await getString(IPFSNode, createdMessages[i]);
-    console.log(createdMessages[i], fileContents);
-    let parsedMessage = await parseMessage(createdMessages[i], fileContents);
-    if (parsedMessage != null) {
-      console.log("Message Add Response:", myDB.addMessage(parsedMessage));
+    //process messages (can choose to rebroadcast and add back to createdMessages)
+    while(createdMessages.length > 0) {
+      var thisMessage = createdMessages.pop();
+      var i;
+      for (i = 0; i < agents.length; i++) {
+        if (Math.random() > 0.5) {
+          //NEED TO CONSIDER PULLING HISTORY
+          const {shouldBlacklist, parsedMessage} = await parseMessage(thisMessage[0], thisMessage[1]); //should never be blacklist for self
+          if (shouldBlacklist) {
+            console.log("NEED TO IMPLEMENT BLACKLIST", shouldBlacklist);
+          } else {
+            if (parsedMessage) {
+              if (parsedMessage.publicKey != agents[i].publicKey) {
+                agents[i].seenURLs.push(parsedMessage.url);
+              }
+              agents[i].db.addMessage(parsedMessage);
+            }
+          }
+        }
+      }
     }
+
+    //get getPeerReputations
+    var i;
+    for (i = 0; i < agents.length; i++) {
+      console.log(i, "reputations");
+      console.log(agents[i].db.getPeerReputations(agents[i].publicKey));
+      console.log("\n");
+    }
+    console.log("***********","ROUND COMPLETE", y, "***********");
+    console.log("\n\n");
+    y += 1;
+
+
   }
 
-  //TEST IF REPUTATION OF SAID PEER IS 1
-  console.log(myDB.getPeerReputations(publicKey));
-  console.log(urlsToRate[0], "Risk Score:", myDB.getURLRiskScore(publicKey, cleanURL(urlsToRate[0])))
-  console.log(urlsToRate[1], "Risk Score:", myDB.getURLRiskScore(publicKey, cleanURL(urlsToRate[1])));
+
+
+
+  // //CREATE VALID MESSAGES
+  // var lastMessageIPFS = null;
+  // var createdMessages = [];
+  // var i;
+  // for (i = 0; i < urlsToRate.length; i++) {
+  //   let thisMessageIPFS = await createMessage(IPFSNode, urlsToRate[i], 1, lastMessageIPFS, publicKey, privateKey);
+  //   createdMessages.push(thisMessageIPFS);
+  //   lastMessageIPFS = thisMessageIPFS;
+  // }
+  //
+  // //RECIEVE MESSAGES
+  // var i;
+  // for (i = 0; i < createdMessages.length; i++) {
+  //   //check DB to make sure not already contains before doing work
+  //   let fileContents = await getString(IPFSNode, createdMessages[i]);
+  //   let parsedMessage = await parseMessage(createdMessages[i], fileContents);
+  //   if (parsedMessage != null) {
+  //     console.log("Message Add Response:", myDB.addMessage(parsedMessage));
+  //   }
+  // }
+  //
+  // //CREATE NEW IDENTITY AND RATE SAME AS ORIGINAL
+  // var {publicKey, privateKey} = await createKeys();
+  //
+  // //ADD TO DB
+  // var lastMessageIPFS = null;
+  // var createdMessages = [];
+  // var i;
+  // for (i = 0; i < urlsToRate.length; i++) {
+  //   let thisMessageIPFS = await createMessage(IPFSNode, urlsToRate[i], 1, lastMessageIPFS, publicKey, privateKey);
+  //   createdMessages.push(thisMessageIPFS);
+  //   lastMessageIPFS = thisMessageIPFS;
+  //   break;
+  // }
+  //
+  // var i;
+  // for (i = 0; i < createdMessages.length; i++) {
+  //   //check DB to make sure not already contains before doing work
+  //   let fileContents = await getString(IPFSNode, createdMessages[i]);
+  //   let parsedMessage = await parseMessage(createdMessages[i], fileContents);
+  //   if (parsedMessage != null) {
+  //     console.log("Message Add Response:", myDB.addMessage(parsedMessage));
+  //   }
+  // }
+  //
+  // //TEST IF REPUTATION OF SAID PEER IS 1
+  // console.log(myDB.getPeerReputations(publicKey));
+  // console.log(urlsToRate[0], "Risk Score:", myDB.getURLRiskScore(publicKey, cleanURL(urlsToRate[0])))
+  // console.log(urlsToRate[1], "Risk Score:", myDB.getURLRiskScore(publicKey, cleanURL(urlsToRate[1])));
 
 }
 
@@ -406,6 +467,3 @@ const node = new IPFS({
 node.on('ready', async () => {
   performTest(node);
 });
-
-
-// findNonce("eJyNkz1uFEEQhTkChyBkvf3f1RNZ4gpETlbVVdXsSMvMamdsIDQkpA44ANjIBpEgIULusRKHoWe9GNkGiYlG3f2+fv2q6u3VIfXdKC/HH8txXA/NfP7CtnzQb57NaYltt+7bbpyf2Ivx1Vo+P7lZuljisNweZjCmaGLDVCiAzy4KWLEJlIFU2DOILcUiGJZiHEfWHCBnE41ka75MmEXLi65n2T5K4JMDVrMSDc20FphhRjtTGo2NEotS8H0nGY7z83Yc5Vq5wPGbURpm2syUfaqh8aax7ugGT/1mwiftA8ktvA2+4lOKko3xKHfxk/LveH90lTfY0VKGs9cfV5hl9ZVwtZiW+s3ieu+8Xw8/Hzw8fb/aPt45bbn5n1eefujXl8MSZ8aHnXjnYxL/xxvuit917TCemEZ7ZyFYbVT9GmWxls3XciCW4DHqnEk7lSikYG1SWCRpVSoZIlhLQoiOTNaWubqAlDMmRNLibCi1nB4yi3BIokSzK84RQK4ntddGSqn4DI60BkYKt11utofs6ttjFtBI4IKOyXvrNFgTQQNSqZwUi1VKC2OgbHyE6kAVYudTvgfMBYAInQ7AznBR5F2MVC2hipKSRJNiCD7WJk4xZq6bqiZgyMUEhe4BY61byb5Gzy6YysneYdExeBeSqbEmX/MgVf9KzpI8+2oXC5gsjkq8W5hkppy1uqlM8I1ufk8iHvwZwWkim9pdzV6xs0NiA9WgSlYYonIm1PsDqGA5iK45q5iJQ3Ql+gTZBXYoNU1MkJhJ3bJzed23w9mb3ayf18s+7Vu55cv9tRfHm3Y42x78y+K8qqRj3Mz3gvk0Tr8AdMZs9g==")
