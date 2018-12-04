@@ -3,6 +3,8 @@ const crypto2 = require('crypto2');
 const hexToBinary = require('hex-to-binary');
 const bigInt = require("big-integer");
 const IPFS = require('ipfs');
+const simpledb = require('./simpledb.js');
+
 
 async function createKeys() {
   console.log("CREATING KEY PAIRS");
@@ -231,7 +233,7 @@ async function blacklistPeer(publicKey) {
   }
 }
 
-async function parseMessage(recievedMessage) { //returns null if not valid
+async function parseMessage(messageIPFS, recievedMessage) { //returns null if not valid
   const difficulty = 5;
   const parsedMessage = JSON.parse(recievedMessage);
 
@@ -299,9 +301,12 @@ async function parseMessage(recievedMessage) { //returns null if not valid
     publicKey:parsedMessage["message"]["publicKey"],
     rating:parsedPayload["rating"],
     url:parsedPayload["url"],
+    messageIPFS:messageIPFS
   };
   if (parsedPayload["lastMessageIPFS"]) {
-    toReturn["lastMessageIPFS"] = parsedPayload["lastMessageIPFS"]
+    toReturn["lastMessageIPFS"] = parsedPayload["lastMessageIPFS"];
+  } else {
+    toReturn["lastMessageIPFS"] = "<none>";
   }
 
   console.log("Parsed Message:", toReturn);
@@ -318,16 +323,23 @@ async function performTest(IPFSNode) {
   // ];
 
   var urlsToRate = [
-    "https://bleacherreport.com/articles/2808828-kareem-hunt-admits-lying-to-chiefs-apologizes-in-nfl-countdown-interview?utm_source=cnn.com&utm_medium=referral&utm_campaign=editorial"
+    "https://bleacherreport.com/articles/2808828-kareem-hunt-admits-lying-to-chiefs-apologizes-in-nfl-countdown-interview?utm_source=cnn.com&utm_medium=referral&utm_campaign=editorial",
+    "https://security.stackexchange.com/questions/14262/hashcash-is-this-really-used"
   ];
 
-  const {publicKey, privateKey} = await createKeys();
+  // var urlsToRate = [
+  //   "https://bleacherreport.com/articles/2808828-kareem-hunt-admits-lying-to-chiefs-apologizes-in-nfl-countdown-interview?utm_source=cnn.com&utm_medium=referral&utm_campaign=editorial",
+  // ];
+
+  var {publicKey, privateKey} = await createKeys();
+  var myDB = new simpledb();
 
   //CREATE VALID MESSAGES
   var lastMessageIPFS = null;
   var createdMessages = [];
   var i;
   for (i = 0; i < urlsToRate.length; i++) {
+    console.log(myDB.getOldestSeen(urlsToRate[i]));
     let thisMessageIPFS = await createMessage(IPFSNode, urlsToRate[i], 1, lastMessageIPFS, publicKey, privateKey);
     createdMessages.push(thisMessageIPFS);
     lastMessageIPFS = thisMessageIPFS;
@@ -336,10 +348,45 @@ async function performTest(IPFSNode) {
   //RECIEVE MESSAGES
   var i;
   for (i = 0; i < createdMessages.length; i++) {
+    //check DB to make sure not already contains before doing work
     let fileContents = await getString(IPFSNode, createdMessages[i]);
     console.log(createdMessages[i], fileContents);
-    await parseMessage(fileContents);
+    let parsedMessage = await parseMessage(createdMessages[i], fileContents);
+    if (parsedMessage != null) {
+      console.log("Message Add Response:", myDB.addMessage(parsedMessage));
+    }
   }
+
+  //CREATE NEW IDENTITY AND RATE SAME AS ORIGINAL
+  var {publicKey, privateKey} = await createKeys();
+
+  //ADD TO DB
+  var lastMessageIPFS = null;
+  var createdMessages = [];
+  var i;
+  for (i = 0; i < urlsToRate.length; i++) {
+    console.log(myDB.getOldestSeen(urlsToRate[i]));
+    let thisMessageIPFS = await createMessage(IPFSNode, urlsToRate[i], 1, lastMessageIPFS, publicKey, privateKey);
+    createdMessages.push(thisMessageIPFS);
+    lastMessageIPFS = thisMessageIPFS;
+    break;
+  }
+
+  var i;
+  for (i = 0; i < createdMessages.length; i++) {
+    //check DB to make sure not already contains before doing work
+    let fileContents = await getString(IPFSNode, createdMessages[i]);
+    console.log(createdMessages[i], fileContents);
+    let parsedMessage = await parseMessage(createdMessages[i], fileContents);
+    if (parsedMessage != null) {
+      console.log("Message Add Response:", myDB.addMessage(parsedMessage));
+    }
+  }
+
+  //TEST IF REPUTATION OF SAID PEER IS 1
+  console.log(myDB.getPeerReputations(publicKey));
+  console.log(urlsToRate[0], "Risk Score:", myDB.getURLRiskScore(publicKey, cleanURL(urlsToRate[0])))
+  console.log(urlsToRate[1], "Risk Score:", myDB.getURLRiskScore(publicKey, cleanURL(urlsToRate[1])));
 
 }
 
