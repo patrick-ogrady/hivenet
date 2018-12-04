@@ -63,30 +63,23 @@ function messages(IPFSNode, publicKey, privateKey, lastIPFS, messageSentCallback
   this.inProcess = false;
   this.messageQueue = [];
   this.createMessageQueue = function (url, rating) {
-    if (this.messageIndex == null) {
-      this.messageIndex = 0
-    }
-
     if (!this.inProcess) {
       console.log("Nothing in process!");
-      this.createMessage(url, rating, this.messageIndex);
+      this.createMessage(url, rating);
     } else {
       console.log("Message in Queue:", this.messageQueue.length);
-      this.messageQueue.push([url, rating, this.messageIndex]);
+      this.messageQueue.push([url, rating]);
     }
-    this.messageIndex += 1;
-    return this.messageIndex - 1;
+
+    return this.messageQueue.length;
+
   }
 
-  this.calculateNonce = async function (proofHash) {
-
-    const hash = await crypto2.hash.sha256(proofHash + );
-  }
-
-  this.createMessage = async function (url, rating, messageIndex) {
+  this.createMessage = async function (url, rating) {
     /**
     {
       proof:messageProof,
+      nonce:xxx
       message:{
         signature:signature,
         publicKey:,
@@ -94,7 +87,6 @@ function messages(IPFSNode, publicKey, privateKey, lastIPFS, messageSentCallback
           url:,
           rating:,
           lastMessageIPFS:(don't put in payload if no prior messages),
-          messageIndex:(ensureStrictOrderOfMessages)
         }
       }
     }
