@@ -48,7 +48,7 @@ async function getString(IPFSNode, ipfsAddress) {
       });
     });
     let IPFSContents = await promise;
-    console.log("MESSAGE IPFS Contents:", IPFSContents);
+    // console.log("MESSAGE IPFS Contents:", IPFSContents);
     return IPFSContents;
   } catch (err) {
     return null;
@@ -367,12 +367,31 @@ async function performTest(IPFSNode) {
       for (i = 0; i < agents.length; i++) {
         if (Math.random() > 0.5) {
           //NEED TO CONSIDER PULLING HISTORY
-          const {shouldBlacklist, parsedMessage} = await parseMessage(thisMessage[0], thisMessage[1]); //should never be blacklist for self
+          var {shouldBlacklist, parsedMessage} = await parseMessage(thisMessage[0], thisMessage[1]); //should never be blacklist for self
           if (shouldBlacklist) {
             console.log("NEED TO IMPLEMENT BLACKLIST", shouldBlacklist);
           } else {
             if (parsedMessage) {
-              agents[i].db.addMessage(agents[i].publicKey, parsedMessage);
+              var {shouldBlacklist, historyPull} = agents[i].db.addMessage(agents[i].publicKey, parsedMessage);
+              if (shouldBlacklist) {
+                console.log("NEED TO IMPLEMENT BLACKLIST", shouldBlacklist);
+              }
+              if (historyPull && historyPull != "<none>") {
+                const originalPublicKey = parsedMessage.publicKey;
+                console.log("Should Historical Pull:", historyPull);
+                while (historyPull != null && historyPull != "<none>") {
+                  var fileContents = await getString(IPFSNode, historyPull);
+                  var {shouldBlacklist, parsedMessage} = await parseMessage(historyPull, fileContents);
+                  if (originalPublicKey != parsedMessage.publicKey || shouldBlacklist) {
+                    console.log("NEED TO IMPLEMENT BLACKLIST", shouldBlacklist);
+                  }
+                  var {shouldBlacklist, historyPull} = agents[i].db.addMessage(agents[i].publicKey, parsedMessage);
+                  if (shouldBlacklist) {
+                    console.log("NEED TO IMPLEMENT BLACKLIST", shouldBlacklist);
+                    break
+                  }
+                }
+              }
             }
           }
         }

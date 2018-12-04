@@ -22,7 +22,6 @@ function simpledb() {
     }
   }
 
-  this.changesSinceNewRecommendations = 0;
 
   this.messages = this.getCollection('messages', 'messageIPFS');
   this.blacklistPeers = this.getCollection('blacklistPeers', 'publicKey');
@@ -64,25 +63,25 @@ function simpledb() {
       //check to see if message already exists in DB
       if (this.checkMessageIPFS(message.messageIPFS)) {
         console.log("Message already in DB!", message.messageIPFS);
-        return null;
+        return {shouldBlacklist:null, historyPull:null};
       }
 
       //check to see if public key blacklisted
       if (this.checkBlacklistPeer(message.publicKey)) {
         console.log("Peer Blacklisted!", message.publicKey);
-        return null;
+        return {shouldBlacklist:null, historyPull:null};
       }
 
       //check to see if multiple messages with same last messageID
       if (this.checkMessagePastValid(message.lastMessageIPFS, message.publicKey)) {
         console.log("Multiple messages with lastMessageIPFS!");
-        return false; //should blacklist
+        return {shouldBlacklist:message.publicKey, historyPull:null};
       }
 
       //check to see if public key already rated URL
       if (this.checkIfAlreadyRated(message.publicKey, message.url)) {
         console.log("URL already rated by publicKey!");
-        return false; //should blacklist (can't change ratings)
+        return {shouldBlacklist:message.publicKey, historyPull:null};
       }
 
       //don't store work or proof in DB
@@ -95,16 +94,17 @@ function simpledb() {
         messageIPFS:message.messageIPFS
       });
 
-      this.changesSinceNewRecommendations += 1;
 
       //update recommendations
-      if (this.recommendations.chain().data().length == 0) { //|| this.changesSinceNewRecommendations > 5
-        this.changesSinceNewRecommendations = 0;
+      if (this.recommendations.chain().data().length == 0) {
         this.calculateRecommendations(selfPublicKey);
       }
 
-
-      return true;
+      if (this.checkMessageIPFS(message.lastMessageIPFS) == false) {
+        return {shouldBlacklist:null, historyPull:message.lastMessageIPFS};
+      } else {
+        return {shouldBlacklist:null, historyPull:null};
+      }
     } catch (error) {
       console.log("Can't add to messages!", error);
     }
