@@ -8,6 +8,9 @@ const utils = require('./utils.js');
 const agent = require("./agent.js");
 const chaos = require("./chaos.js");
 
+//CONSTANTS
+const SHOUD_ATTACK = true;
+
 async function createAgent() {
   var agentInstance = new agent();
   await agentInstance.initialize();
@@ -17,7 +20,7 @@ async function createAgent() {
 async function performTest(IPFSNode) {
 
   var agents = [];
-  const numAgents = 2;
+  const numAgents = 5;
   var i;
   for (i = 0; i < numAgents; i++) {
     console.log("Agent:", i)
@@ -26,7 +29,7 @@ async function performTest(IPFSNode) {
     agents.push(thisAgent);
   }
 
-  var chaosAgent = new chaos();
+  var chaosAgent = new chaos(await createAgent());
 
 
   //simulate 10 rounds
@@ -54,9 +57,13 @@ async function performTest(IPFSNode) {
       }
     }
 
-    //send messages from malicious agents (modify observed messages)
-    chaosAgent.malignMessage(null);
-
+    if (SHOUD_ATTACK) {
+      //send messages from malicious agent with valid signature
+      createdMessages.push(await chaosAgent.createValidMessage(IPFSNode));
+      if (Math.random() > 0.9) {
+        createdMessages.push(await chaosAgent.createRandomBadMessage(IPFSNode));
+      }
+    }
 
     //process messages (can choose to rebroadcast and add back to createdMessages)
     var messagesToBroadcast = [];
@@ -77,6 +84,15 @@ async function performTest(IPFSNode) {
           }
 
           var {shouldBlacklist, historyPull, shouldBroadcast} = agents[i].db.addMessage(parsedMessage);
+
+          if (shouldBlacklist) {
+            agents[i].db.addBlacklistPeer(shouldBlacklist);
+            continue
+          }
+
+          //pull history
+          var shouldBlacklist = await utils.pullHistory(IPFSNode, agents[i], parsedMessage.publicKey, historyPull);
+
           if (shouldBlacklist) {
             agents[i].db.addBlacklistPeer(shouldBlacklist);
             continue
@@ -85,9 +101,6 @@ async function performTest(IPFSNode) {
           if (shouldBroadcast) {
             messagesToBroadcast.push(thisMessage);
           }
-
-          //pull history
-          await utils.pullHistory(IPFSNode, agents[i], parsedMessage.publicKey, historyPull);
         }
       }
     }

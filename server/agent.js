@@ -47,6 +47,10 @@ function agent() {
     }
   }
 
+  this.popUnseenURL = function() {
+    return this.urls.pop();
+  }
+
   this.getRating = function() {
     if (Math.random() > 0.5) {
       return 1;

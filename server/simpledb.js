@@ -40,12 +40,17 @@ function simpledb(thisPublicKey) {
       this.messages.chain().find({'publicKey' : publicKey}).remove();
 
     } catch (error) {
-      console.log("Can't add to blacklistPeers!", error);
+      //means already in blacklist
+      // console.log("Can't add to blacklistPeers!", error);
     }
   }
 
   this.getAllBlacklistedPeers = function() {
     return this.blacklistPeers.chain().data();
+  }
+
+  this.clearBlacklist = function() {
+    this.blacklistPeers.chain().remove();
   }
 
   this.checkIfAlreadyRated = function(publicKey, url) {
@@ -58,6 +63,10 @@ function simpledb(thisPublicKey) {
 
   this.checkMessageIPFS = function(messageIPFS) {
     return this.messages.chain().find({'messageIPFS' : messageIPFS}).data().length > 0;
+  }
+
+  this.getMessageIPFS = function(messageIPFS) {
+    return this.messages.chain().find({'messageIPFS' : messageIPFS}).data()[0];
   }
 
   this.checkMessagePastValid = function(lastMessageIPFS, publicKey) {
@@ -123,12 +132,8 @@ function simpledb(thisPublicKey) {
         messageIPFS:message.messageIPFS
       });
 
+      return {shouldBlacklist:null, historyPull:message.lastMessageIPFS, shouldBroadcast:true};
 
-      if (this.checkMessageIPFS(message.lastMessageIPFS) == false) {
-        return {shouldBlacklist:null, historyPull:message.lastMessageIPFS, shouldBroadcast:true};
-      } else {
-        return {shouldBlacklist:null, historyPull:null, shouldBroadcast:true};
-      }
     } catch (error) {
       console.log("Can't add to messages!", error);
     }

@@ -265,7 +265,7 @@ module.exports = {
     if ("message" in parsedMessage) {
       if ("signature" in parsedMessage["message"] && "publicKey" in parsedMessage["message"] && "payload" in parsedMessage["message"]) {
         const isSignatureValid = await crypto2.verify.sha256(parsedMessage["message"]["payload"], parsedMessage["message"]["publicKey"], parsedMessage["message"]["signature"]);
-        if (!isSignatureValid) {
+        if (!isSignatureValid || parsedMessage["message"]["publicKey"] != validPublicKey) {
           console.log("invalid signature interior");
           return {shouldBlacklist:validPublicKey, parsedMessage:null};
         }
@@ -312,9 +312,19 @@ module.exports = {
     }
 
     const parsedPayload = JSON.parse(parsedMessage["message"]["payload"]);
+    if (parsedPayload["url"].length < 5) {
+      console.log("Invalid URL!");
+      return {shouldBlacklist:validPublicKey, parsedMessage:null};
+    }
+
+    if (parsedPayload["rating"] != 0 && parsedPayload["rating"] != 1) {
+      console.log("Invalid rating!");
+      return {shouldBlacklist:validPublicKey, parsedMessage:null};
+    }
+
     var toReturn = {
       creationTime:creationTime,
-      publicKey:parsedMessage["message"]["publicKey"],
+      publicKey:validPublicKey,
       rating:parsedPayload["rating"],
       url:parsedPayload["url"],
       messageIPFS:messageIPFS
@@ -333,19 +343,33 @@ module.exports = {
       var historyPull = nextMessageIPFS;
       console.log("Should Historical Pull:", historyPull);
       while (historyPull != null && historyPull != "<none>") {
-        var fileContents = await this.getString(IPFSNode, historyPull);
-        var {shouldBlacklist, parsedMessage} = await this.parseMessage(historyPull, fileContents);
-        if (originalPublicKey != parsedMessage.publicKey || shouldBlacklist) {
-          thisAgent.db.addBlacklistPeer(originalPublicKey);
-          break
-        }
-        var {shouldBlacklist, historyPull} = thisAgent.db.addMessage(parsedMessage);
-        if (shouldBlacklist) {
-          thisAgent.db.addBlacklistPeer(originalPublicKey);
-          break
+        if (thisAgent.db.checkMessageIPFS(historyPull) == false) {
+          var fileContents = await this.getString(IPFSNode, historyPull);
+          var {shouldBlacklist, parsedMessage} = await this.parseMessage(historyPull, fileContents);
+          if (shouldBlacklist) {
+            return originalPublicKey;
+          }
+          if (originalPublicKey != parsedMessage.publicKey) {
+            console.log("History stealing!");
+            return originalPublicKey;
+          }
+          var {shouldBlacklist, historyPull} = thisAgent.db.addMessage(parsedMessage);
+          if (shouldBlacklist) {
+            return originalPublicKey;
+          }
+        } else {
+          //need to check to ensure no history mutation in case message already saved
+          if (originalPublicKey != thisAgent.db.getMessageIPFS(historyPull).publicKey) {
+            console.log("History stealing!");
+            return originalPublicKey;
+          }
+
+          break //assume have entire history
         }
       }
+      return null;
     }
+    return null;
   }
 
 
