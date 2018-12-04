@@ -18,8 +18,6 @@ function agent() {
     this.lastMessageIPFS = null;
     this.urls = null;
 
-    this.seenURLs = []; //used to speed up recommendation process
-
     let promise = new Promise((resolve, reject) => {
       fs.readFile( __dirname + '/wiki.txt', function (err, data) {
         if (err) {
@@ -35,11 +33,16 @@ function agent() {
   }
 
   this.getRandomURL = function() {
-    shuffle(this.seenURLs);
     if (Math.floor((Math.random() * 10) + 1) < 5) {
       return this.urls.pop();
     } else {
-      return this.seenURLs.pop();
+      var thisRec = this.db.getRecommendation();
+      if (thisRec) {
+        console.log("Recommendation:", thisRec.url, "Score:", thisRec.score);
+        return thisRec.url;
+      } else {
+        return null;
+      }
     }
   }
 

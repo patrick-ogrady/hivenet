@@ -324,7 +324,7 @@ async function createAgent() {
 async function performTest(IPFSNode) {
 
   var agents = [];
-  const numAgents = 10;
+  const numAgents = 4;
   var i;
   for (i = 0; i < numAgents; i++) {
     console.log("Agent:", i)
@@ -355,7 +355,7 @@ async function performTest(IPFSNode) {
         const {IPFSHash, messageContents} = await createMessage(IPFSNode, urlToSend, ratingToGive, agents[i].lastMessageIPFS, agents[i].publicKey, agents[i].privateKey);
         agents[i].lastMessageIPFS = IPFSHash;
         const {shouldBlacklist, parsedMessage} = await parseMessage(IPFSHash, messageContents); //should never be blacklist for self
-        agents[i].db.addMessage(parsedMessage);
+        agents[i].db.addMessage(agents[i].publicKey, parsedMessage);
 
         createdMessages.push([IPFSHash, messageContents]); //broadcast
       }
@@ -372,10 +372,7 @@ async function performTest(IPFSNode) {
             console.log("NEED TO IMPLEMENT BLACKLIST", shouldBlacklist);
           } else {
             if (parsedMessage) {
-              if (parsedMessage.publicKey != agents[i].publicKey) {
-                agents[i].seenURLs.push(parsedMessage.url);
-              }
-              agents[i].db.addMessage(parsedMessage);
+              agents[i].db.addMessage(agents[i].publicKey, parsedMessage);
             }
           }
         }

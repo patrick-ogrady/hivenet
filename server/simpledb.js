@@ -22,6 +22,8 @@ function simpledb() {
     }
   }
 
+  this.changesSinceNewRecommendations = 0;
+
   this.messages = this.getCollection('messages', 'messageIPFS');
   this.blacklistPeers = this.getCollection('blacklistPeers', 'publicKey');
   this.recommendations = this.getCollection('recommendations', 'address');
@@ -57,7 +59,7 @@ function simpledb() {
     return this.messages.chain().find({'$and': [{'lastMessageIPFS':lastMessageIPFS}, {'publicKey':publicKey}]}).data().length > 0;
   }
 
-  this.addMessage = function(message) {
+  this.addMessage = function(selfPublicKey, message) {
     try {
       //check to see if message already exists in DB
       if (this.checkMessageIPFS(message.messageIPFS)) {
@@ -92,6 +94,15 @@ function simpledb() {
         lastMessageIPFS:message.lastMessageIPFS,
         messageIPFS:message.messageIPFS
       });
+
+      this.changesSinceNewRecommendations += 1;
+
+      //update recommendations
+      if (this.recommendations.chain().data().length == 0) { //|| this.changesSinceNewRecommendations > 5
+        this.changesSinceNewRecommendations = 0;
+        this.calculateRecommendations(selfPublicKey);
+      }
+
 
       return true;
     } catch (error) {
@@ -152,53 +163,52 @@ function simpledb() {
     if (totalReputation == 0) {
       return 1;
     }
-    
+
     return 1 - reputationFor/totalReputation;
   }
 
+  this.calculateRecommendations = function(publicKey) {
 
+    this.recommendations.chain().remove();
 
-  //
-  // function calculateRecommendations(publicKey) {
-  //   this.recommendations.chain().remove()
-  //   var allUniqueHostnames = this.getUniqueWhitelistHostnames();
-  //
-  //   var applicableRatings = this.getRatingsForHostnames(allUniqueHostnames);
-  //
-  //   var recommender = new jsrecommender.Recommender();
-  //   var table = new jsrecommender.Table();
-  //
-  //   for (rating in applicableRatings) {
-  //     var thisRating = applicableRatings[rating];
-  //     table.setCell(thisRating.address, thisRating.publicKey, thisRating.rating);
-  //   }
-  //
-  //   var model = recommender.fit(table);
-  //
-  //   var predicted_table = recommender.transform(table);
-  //   var urls_to_view = [];
-  //
-  //   for (var j = 0; j < predicted_table.rowNames.length; ++j) {
-  //     var url_string = predicted_table.rowNames[j];
-  //     if (table.containsCell(url_string, this.publicKey) == false) {
-  //       recommendations.insert({
-  //         address:url_string,
-  //         score:predicted_table.getCell(url_string, this.publicKey)
-  //       });
-  //     }
-  //   }
-  // }
-  //
-  // this.getRecommendation = function() {
-  //   var resultSet = this.recommendations.chain().simplesort('score').limit(1);
-  //   var resultSetData = resultSet.data();
-  //   if (resultSetData.length > 0) {
-  //     resultSet.remove()
-  //     return resultSetData[0];
-  //   } else {
-  //     return null;
-  //   }
-  // }
+    var applicableRatings = this.messages.chain().data(); //update to restrict via score
+
+    console.log("Calculating New Recommendations on ", applicableRatings.length, " items");
+
+    var recommender = new jsrecommender.Recommender();
+    var table = new jsrecommender.Table();
+
+    for (rating in applicableRatings) {
+      var thisRating = applicableRatings[rating];
+      table.setCell(thisRating.url, thisRating.publicKey, thisRating.rating);
+    }
+
+    var model = recommender.fit(table);
+
+    var predicted_table = recommender.transform(table);
+    var urls_to_view = [];
+
+    for (var j = 0; j < predicted_table.rowNames.length; ++j) {
+      var url_string = predicted_table.rowNames[j];
+      if (table.containsCell(url_string, publicKey) == false) {
+        this.recommendations.insert({
+          url:url_string,
+          score:predicted_table.getCell(url_string, publicKey)
+        });
+      }
+    }
+  }
+
+  this.getRecommendation = function() {
+    var resultSet = this.recommendations.chain().simplesort('score').limit(1);
+    var resultSetData = resultSet.data();
+    if (resultSetData.length > 0) {
+      resultSet.remove()
+      return resultSetData[0];
+    } else {
+      return null;
+    }
+  }
 }
 
 module.exports = simpledb;
