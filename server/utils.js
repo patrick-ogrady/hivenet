@@ -182,6 +182,7 @@ module.exports = {
     return myURL.href;
   },
 
+  //need two signatures (one for block sent to chainpoint and one to ensure message integrity)
   createMessage: async function(IPFSNode, url, rating, lastMessageIPFS, publicKey, privateKey) {
     var rawPayload = {
       url:this.cleanURL(url),
@@ -221,10 +222,15 @@ module.exports = {
     const messageToSend = JSON.stringify({proof:proofToUse, nonce:nonce, message:{signature:signature, publicKey:publicKey, payload:payload}});
     // console.log("message to send:", messageToSend, "\n");
 
-    let IPFSHash = await this.storeString(IPFSNode, messageToSend);
+    const entireSignature = await crypto2.sign.sha256(messageToSend, privateKey);
+    const fullMessageToSend = JSON.stringify({signature:entireSignature, publicKey:publicKey, messageToSend:messageToSend});
+
+
+
+    let IPFSHash = await this.storeString(IPFSNode, fullMessageToSend);
     // console.log("MESSAGE IPFS:", IPFSHash);
 
-    return {IPFSHash: IPFSHash, messageContents:messageToSend};
+    return {IPFSHash: IPFSHash, messageContents:fullMessageToSend};
 
   },
 
@@ -236,22 +242,36 @@ module.exports = {
 
   parseMessage: async function(messageIPFS, recievedMessage) { //returns null if not valid
     const difficulty = 5;
-    const parsedMessage = JSON.parse(recievedMessage);
-    //check if valid signature (then can blacklist for errors)
+    const parsedMessageTop = JSON.parse(recievedMessage);
+
+    //check if valid signature on entire signature (then can blacklist for errors)
     var validPublicKey = null;
-    if ("message" in parsedMessage) {
-      if ("signature" in parsedMessage["message"] && "publicKey" in parsedMessage["message"] && "payload" in parsedMessage["message"]) {
-        const isSignatureValid = await crypto2.verify.sha256(parsedMessage["message"]["payload"], parsedMessage["message"]["publicKey"], parsedMessage["message"]["signature"]);
-        if (isSignatureValid == true) {
-          // console.log("valid signature!")
-          validPublicKey = parsedMessage["message"]["publicKey"];
-        } else {
-          console.log("invalid signature");
-          return {shouldBlacklist:null, parsedMessage:null};
-        }
+    if ("signature" in parsedMessageTop && "publicKey" in parsedMessageTop && "messageToSend" in parsedMessageTop) {
+      const isSignatureValid = await crypto2.verify.sha256(parsedMessageTop["messageToSend"], parsedMessageTop["publicKey"], parsedMessageTop["signature"]);
+      if (isSignatureValid == true) {
+        // console.log("valid signature!")
+        validPublicKey = parsedMessageTop["publicKey"];
       } else {
         console.log("invalid signature");
         return {shouldBlacklist:null, parsedMessage:null};
+      }
+    } else {
+      console.log("invalid signature");
+      return {shouldBlacklist:null, parsedMessage:null};
+    }
+
+    var parsedMessage = JSON.parse(parsedMessageTop["messageToSend"]);
+
+    if ("message" in parsedMessage) {
+      if ("signature" in parsedMessage["message"] && "publicKey" in parsedMessage["message"] && "payload" in parsedMessage["message"]) {
+        const isSignatureValid = await crypto2.verify.sha256(parsedMessage["message"]["payload"], parsedMessage["message"]["publicKey"], parsedMessage["message"]["signature"]);
+        if (!isSignatureValid) {
+          console.log("invalid signature interior");
+          return {shouldBlacklist:validPublicKey, parsedMessage:null};
+        }
+      } else {
+        console.log("invalid signature interior");
+        return {shouldBlacklist:validPublicKey, parsedMessage:null};
       }
     }
 

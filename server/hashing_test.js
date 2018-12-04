@@ -4,9 +4,10 @@ const hexToBinary = require('hex-to-binary');
 const bigInt = require("big-integer");
 const IPFS = require('ipfs');
 const simpledb = require('./simpledb.js');
-const utils = require('./utils.js')
-
+const utils = require('./utils.js');
 const agent = require("./agent.js");
+const chaos = require("./chaos.js");
+
 async function createAgent() {
   var agentInstance = new agent();
   await agentInstance.initialize();
@@ -16,7 +17,7 @@ async function createAgent() {
 async function performTest(IPFSNode) {
 
   var agents = [];
-  const numAgents = 4;
+  const numAgents = 2;
   var i;
   for (i = 0; i < numAgents; i++) {
     console.log("Agent:", i)
@@ -24,6 +25,8 @@ async function performTest(IPFSNode) {
     console.log(thisAgent.publicKey);
     agents.push(thisAgent);
   }
+
+  var chaosAgent = new chaos();
 
 
   //simulate 10 rounds
@@ -33,25 +36,28 @@ async function performTest(IPFSNode) {
   var y = 0;
   while (true) {
     var i;
+    //send messages from honest agents
     for (i = 0; i < agents.length; i++) {
       var urlToSend = agents[i].getRandomURL();
       var ratingToGive = agents[i].getRating();
       if (urlToSend != null) {
-        if (agents[i].db.checkIfAlreadyRated(agents[i].publicKey, urlToSend)) {
-          continue;
-        }
-
         console.log("Agent:", i, urlToSend, "Rating:", ratingToGive, "Risk Score:", agents[i].db.getURLRiskScore(urlToSend));
-
-
         const {IPFSHash, messageContents} = await utils.createMessage(IPFSNode, urlToSend, ratingToGive, agents[i].lastMessageIPFS, agents[i].publicKey, agents[i].privateKey);
         agents[i].lastMessageIPFS = IPFSHash;
         const {shouldBlacklist, parsedMessage} = await utils.parseMessage(IPFSHash, messageContents); //should never be blacklist for self
         agents[i].db.addMessage(parsedMessage);
-
         createdMessages.push([IPFSHash, messageContents]); //broadcast
+
+
+
+        chaosAgent.observeMessage(messageContents);
       }
     }
+
+    //send messages from malicious agents (modify observed messages)
+    chaosAgent.malignMessage(null);
+
+
     //process messages (can choose to rebroadcast and add back to createdMessages)
     var messagesToBroadcast = [];
     while(createdMessages.length > 0) {
