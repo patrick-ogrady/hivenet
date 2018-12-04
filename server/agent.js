@@ -14,7 +14,7 @@ function agent() {
     var {publicKey, privateKey} = await createKeys();
     this.publicKey = publicKey;
     this.privateKey = privateKey;
-    this.db = new simpledb();
+    this.db = new simpledb(this.publicKey);
     this.lastMessageIPFS = null;
     this.urls = null;
 
@@ -36,6 +36,7 @@ function agent() {
     if (Math.floor((Math.random() * 10) + 1) < 5) {
       return this.urls.pop();
     } else {
+      this.db.getCountUnseen();
       var thisRec = this.db.getRecommendation();
       if (thisRec) {
         console.log("Recommendation:", thisRec.url, "Score:", thisRec.score);

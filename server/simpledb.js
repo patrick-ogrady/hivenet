@@ -3,7 +3,8 @@ const loki = require('lokijs');
 const cryptr = require('cryptr');
 const jsrecommender = require("./jsrecommender");
 
-function simpledb() {
+function simpledb(thisPublicKey) {
+  this.publicKey = thisPublicKey;
   this.lokiDB = new loki('sandbox');
 
   this.getCollection = function(collectionName, uniqueCol) {
@@ -29,6 +30,7 @@ function simpledb() {
 
   //DB OPS
   this.addBlacklistPeer = function(publicKey) { //added unique specifier
+    console.log("BLACKLIST:", publicKey);
     try {
       this.blacklistPeers.insert({
         publicKey:publicKey
@@ -40,6 +42,10 @@ function simpledb() {
     } catch (error) {
       console.log("Can't add to blacklistPeers!", error);
     }
+  }
+
+  this.getAllBlacklistedPeers = function() {
+    return this.blacklistPeers.chain().data();
   }
 
   this.checkIfAlreadyRated = function(publicKey, url) {
@@ -58,30 +64,53 @@ function simpledb() {
     return this.messages.chain().find({'$and': [{'lastMessageIPFS':lastMessageIPFS}, {'publicKey':publicKey}]}).data().length > 0;
   }
 
-  this.addMessage = function(selfPublicKey, message) {
+  this.getCountUnseen = function() {
+    var allRatedURLs = this.messages.chain().find({'publicKey':this.publicKey}).data();
+    var urlsSeen = [];
+    for (i in allRatedURLs) {
+      urlsSeen.push(allRatedURLs[i].url);
+    }
+    console.log("Seen URLs:", urlsSeen);
+
+    var allUnseenURLs = this.messages.chain().find({'url':{'$nin':urlsSeen}}).data();
+    var urlsUnSeen = [];
+    for (i in allUnseenURLs) {
+      if (!urlsUnSeen.includes(allUnseenURLs[i].url)) {
+        urlsUnSeen.push(allUnseenURLs[i].url);
+      }
+    }
+    console.log("allUnseenURLs URLs:", urlsUnSeen);
+
+  }
+
+  this.addMessage = function(message) {
     try {
       //check to see if message already exists in DB
       if (this.checkMessageIPFS(message.messageIPFS)) {
         console.log("Message already in DB!", message.messageIPFS);
-        return {shouldBlacklist:null, historyPull:null};
+        return {shouldBlacklist:null, historyPull:null, shouldBroadcast:false};
       }
 
       //check to see if public key blacklisted
       if (this.checkBlacklistPeer(message.publicKey)) {
         console.log("Peer Blacklisted!", message.publicKey);
-        return {shouldBlacklist:null, historyPull:null};
+        return {shouldBlacklist:null, historyPull:null, shouldBroadcast:false};
       }
 
       //check to see if multiple messages with same last messageID
       if (this.checkMessagePastValid(message.lastMessageIPFS, message.publicKey)) {
         console.log("Multiple messages with lastMessageIPFS!");
-        return {shouldBlacklist:message.publicKey, historyPull:null};
+        return {shouldBlacklist:message.publicKey, historyPull:null, shouldBroadcast:false};
       }
 
       //check to see if public key already rated URL
       if (this.checkIfAlreadyRated(message.publicKey, message.url)) {
         console.log("URL already rated by publicKey!");
-        return {shouldBlacklist:message.publicKey, historyPull:null};
+        if (message.publicKey != this.publicKey) {
+          return {shouldBlacklist:message.publicKey, historyPull:null, shouldBroadcast:false};
+        } else {
+          return {shouldBlacklist:null, historyPull:null, shouldBroadcast:false};
+        }
       }
 
       //don't store work or proof in DB
@@ -95,22 +124,15 @@ function simpledb() {
       });
 
 
-      //update recommendations
-      if (this.recommendations.chain().data().length == 0) {
-        this.calculateRecommendations(selfPublicKey);
-      }
-
       if (this.checkMessageIPFS(message.lastMessageIPFS) == false) {
-        return {shouldBlacklist:null, historyPull:message.lastMessageIPFS};
+        return {shouldBlacklist:null, historyPull:message.lastMessageIPFS, shouldBroadcast:true};
       } else {
-        return {shouldBlacklist:null, historyPull:null};
+        return {shouldBlacklist:null, historyPull:null, shouldBroadcast:true};
       }
     } catch (error) {
       console.log("Can't add to messages!", error);
     }
   }
-
-
 
   //Calculate Risk Score
   this.getOldestSeen = function(url) {
@@ -122,8 +144,9 @@ function simpledb() {
     }
   }
 
-  this.getPeerReputations = function(notIncludingPublicKey) {
+  this.getPeerReputations = function() {
     //get oldest ratings for all ratings = 1 by self
+    const notIncludingPublicKey = this.publicKey;
     var allPublicKeyRatings = this.messages.chain().find({'$and': [{'rating':1}, {'publicKey':notIncludingPublicKey}]}).data();
     var allCount = {};
     var totalReputation = 0;
@@ -144,7 +167,8 @@ function simpledb() {
     return {peerReputations:allCount, totalReputation:totalReputation};
   }
 
-  this.getURLRiskScore = function(selfPublicKey, url) {
+  this.getURLRiskScore = function(url) {
+    const selfPublicKey = this.publicKey;
     if (this.checkIfAlreadyRated(selfPublicKey, url)) {
       console.log("Self already rated!")
       return 0; //means user already rated
@@ -167,7 +191,7 @@ function simpledb() {
     return 1 - reputationFor/totalReputation;
   }
 
-  this.calculateRecommendations = function(publicKey) {
+  this.calculateRecommendations = function() {
 
     this.recommendations.chain().remove();
 
@@ -190,16 +214,22 @@ function simpledb() {
 
     for (var j = 0; j < predicted_table.rowNames.length; ++j) {
       var url_string = predicted_table.rowNames[j];
-      if (table.containsCell(url_string, publicKey) == false) {
+      if (table.containsCell(url_string, this.publicKey) == false) {
         this.recommendations.insert({
           url:url_string,
-          score:predicted_table.getCell(url_string, publicKey)
+          score:predicted_table.getCell(url_string, this.publicKey)
         });
       }
     }
   }
 
   this.getRecommendation = function() {
+    const selfPublicKey = this.publicKey;
+    //update recommendations
+    if (this.recommendations.chain().data().length == 0) {
+      this.calculateRecommendations(selfPublicKey);
+    }
+
     var resultSet = this.recommendations.chain().simplesort('score').limit(1);
     var resultSetData = resultSet.data();
     if (resultSetData.length > 0) {

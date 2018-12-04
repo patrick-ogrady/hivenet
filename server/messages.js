@@ -99,7 +99,6 @@ function messages(IPFSNode, publicKey, privateKey, lastIPFS, messageSentCallback
     var rawPayload = {
       url:url,
       rating:rating,
-      messageIndex:messageIndex
     };
 
     if (this.lastIPFS != null) {
