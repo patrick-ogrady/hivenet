@@ -26,7 +26,57 @@ function simpledb(thisPublicKey) {
 
   this.messages = this.getCollection('messages', 'messageIPFS');
   this.blacklistPeers = this.getCollection('blacklistPeers', 'publicKey');
-  this.recommendations = this.getCollection('recommendations', 'address');
+  this.recommendations = this.getCollection('recommendations', 'url');
+
+  this.produceCollectionArray = function(collection) {
+    var allData = collection.chain().data();
+    var cleanedArray = [];
+    for (i in allData) {
+      var thisItem = allData[i];
+      delete thisItem.meta;
+      delete thisItem["$loki"]
+      cleanedArray.push(thisItem);
+    }
+    return cleanedArray;
+  }
+
+  this.backupDB = async function() {
+    //export JSON object of entire DB
+    var backupObject = {
+      messages:this.produceCollectionArray(this.messages),
+      blacklistPeers:this.produceCollectionArray(this.blacklistPeers),
+      recommendations:this.produceCollectionArray(this.recommendations)
+    }
+
+    return JSON.stringify(backupObject);
+
+  }
+
+  this.importBackupArray = function(collection, arr) {
+    for (i in arr) {
+      try {
+        collection.insert(arr[i]);
+      } catch (error) {
+        console.log("ERROR:", error);
+      }
+
+    }
+  }
+
+  this.restoreDB = async function(backupString) {
+    //delete all
+    this.lokiDB = new loki('sandbox');
+    this.messages = this.getCollection('messages', 'messageIPFS');
+    this.blacklistPeers = this.getCollection('blacklistPeers', 'publicKey');
+    this.recommendations = this.getCollection('recommendations', 'url');
+
+    const parsedDB = JSON.parse(backupString);
+    this.importBackupArray(this.messages, parsedDB.messages);
+    this.importBackupArray(this.blacklistPeers, parsedDB.blacklistPeers);
+    this.importBackupArray(this.recommendations, parsedDB.recommendations);
+
+
+  }
 
   //DB OPS
   this.addBlacklistPeer = function(publicKey) { //added unique specifier

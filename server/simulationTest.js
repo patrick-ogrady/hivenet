@@ -20,7 +20,7 @@ async function createAgent() {
 async function performTest(IPFSNode) {
 
   var agents = [];
-  const numAgents = 5;
+  const numAgents = 2;
   var i;
   for (i = 0; i < numAgents; i++) {
     console.log("Agent:", i)
@@ -60,8 +60,12 @@ async function performTest(IPFSNode) {
     if (SHOUD_ATTACK) {
       //send messages from malicious agent with valid signature
       createdMessages.push(await chaosAgent.createValidMessage(IPFSNode));
-      if (Math.random() > 0.9) {
+      if (Math.random() > 0.4) {
         createdMessages.push(await chaosAgent.createRandomBadMessage(IPFSNode));
+
+        console.log("CREATING NEW MALICIOUS AGENT IDENTITY!");
+        var chaosAgent = new chaos(await createAgent());
+
       }
     }
 
@@ -115,6 +119,15 @@ async function performTest(IPFSNode) {
       console.log("reputations:",agents[i].db.getPeerReputations());
       //get blacklisted peers
       console.log("blacklist:", agents[i].db.getAllBlacklistedPeers());
+
+      //test backup
+      var backupFile = await agents[i].db.backupDB();
+      agents[i].db.restoreDB(backupFile);
+
+      console.log("reputations:",agents[i].db.getPeerReputations());
+      //get blacklisted peers
+      console.log("blacklist:", agents[i].db.getAllBlacklistedPeers());
+
       console.log("+++++++++++++++");
     }
 
