@@ -118,8 +118,8 @@ module.exports = function(MODE){
   this.verifyProofInChainpoint = async function(proof) {
       if (this.setting == "PROD") {
         let verifiedProofs = await chp.verifyProofs([proof])
-        // console.log("Verified Proof Objects: Expand objects below to inspect.")
-        // console.log(verifiedProofs)
+        console.log("Verified Proof Objects: Expand objects below to inspect.")
+        console.log(verifiedProofs)
 
         if (verifiedProofs.length > 0) {
           return verifiedProofs[0];

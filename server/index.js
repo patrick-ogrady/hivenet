@@ -110,12 +110,13 @@ var inProcess = false;
 var messageQueue = [];
 
 function processMessageQueue(rating, url) {
+  console.log("RATING:", url, "SCORE:", rating);
   if (!inProcess) {
     inProcess = true //some chance where race condition in worst case
-    console.log("Nothing in process!");
+    // console.log("Nothing in process!");
     processMessage(rating, url);
   } else {
-    console.log("Message in Queue:", messageQueue.length);
+    // console.log("Message in Queue:", messageQueue.length);
     messageQueue.push([rating, url]);
   }
 }
