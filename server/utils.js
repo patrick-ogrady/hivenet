@@ -5,7 +5,7 @@ const bigInt = require("big-integer");
 const url = require('url');
 const cryptr = require('cryptr');
 
-const PROD_DIFFICULTY = 21;
+const PROD_DIFFICULTY = 15;
 const GOAL_HASH = 5000;
 
 module.exports = function(MODE){
