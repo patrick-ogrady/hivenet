@@ -2,7 +2,7 @@ const chp = require('chainpoint-client');
 const crypto2 = require('crypto2');
 const hexToBinary = require('hex-to-binary');
 const bigInt = require("big-integer");
-const url = require('url');
+const URL = require('url');
 const cryptr = require('cryptr');
 
 const PROD_DIFFICULTY = 15;
