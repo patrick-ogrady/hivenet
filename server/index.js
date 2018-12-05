@@ -1,50 +1,83 @@
 const IPFS = require('ipfs');
 var figlet = require('figlet');
 const crypto2 = require('crypto2');
-const Configstore = require('configstore');
-const pkg = require('./package.json');
-const conf = new Configstore(pkg.name);
 const simpledb = require('./simpledb.js');
 const utilsLib = require('./utils.js');
 var utils = new utilsLib("PROD");
+
+var fs = require("fs");
+const FILE_PATH = "/var/log/hivenet";
+const publicKeyFile = "publicKey.txt";
+const privateKeyFile = "privateKey.txt";
+const lastMessageIPFSFile = "lastMessageIPFS.txt";
+const dbBackupFile = "dbBackupFile.txt";
+
+async function getFile(fileName) {
+  let promise = new Promise((resolve, reject) => {
+    fs.readFile(FILE_PATH + "/" + fileName, function(err, data) {
+      if (err) {
+        console.log("Get:", err);
+        resolve(null);
+      } else {
+        resolve(data.toString());
+      }
+    })
+  });
+  return await promise;
+}
+
+async function saveFile(fileName, fileContent) {
+  let promise = new Promise((resolve, reject) => {
+    fs.writeFile(FILE_PATH + "/" + fileName, new Buffer.from(fileContent), { flag: 'w' }, function (err) {
+      if (err) {
+        console.log("Save:", err);
+        resolve(false);
+      } else {
+        resolve(true);
+      }
+    });
+  });
+  return await promise;
+}
+
+async function getKeys() {
+  var publicKeyF = await getFile(publicKeyFile);
+  var privateKeyF = await getFile(privateKeyFile);
+  if (!publicKeyF) {
+    const { privateKey, publicKey } = await crypto2.createKeyPair();
+    await saveFile(publicKeyFile, publicKey);
+    publicKeyF = publicKey;
+    await saveFile(privateKeyFile, privateKey);
+    privateKeyF = privateKey;
+  }
+  return {publicKey:publicKeyF, privateKey:privateKeyF};
+}
+
+async function getLastMessageIPFS() {
+  return await getFile(lastMessageIPFSFile);
+}
+
+async function setLastMessageIPFS(lastMessageIPFS) {
+  console.log("BACKING UP LAST MESSAGE IPFS:", lastMessageIPFS);
+  await saveFile(lastMessageIPFSFile, lastMessageIPFS);
+}
 
 const express = require('express');
 const bodyParser = require("body-parser");
 var app = express();
 app.use(bodyParser.json());
 
-async function getKeys() {
-  if (conf.has('publicKey') == false) {
-    // console.log("CREATING KEY PAIRS");
-    const { privateKey, publicKey } = await crypto2.createKeyPair();
-    conf.set('publicKey', publicKey);
-    conf.set('privateKey', privateKey);
-    console.log("Public Key:", publicKey, "\n");
-  }
-
-  return {publicKey:conf.get('publicKey'), privateKey:conf.get('privateKey')};
-}
-
-function getLastMessageIPFS() {
-  if (conf.has('lastMessageIPFS') == false) {
-    return null;
-  } else {
-    return conf.get('lastMessageIPFS');
-  }
-}
-
-function setLastMessageIPFS(lastMessageIPFS) {
-  conf.set('lastMessageIPFS', lastMessageIPFS);
-
-}
-
 //INIT DB (potentially restore)
 // async function get
 async function initDB(IPFSNode) {
   const {publicKey, privateKey} = await getKeys();
   var thisDB = new simpledb(publicKey);
-  if(conf.has('backupDB')) {
-    await thisDB.restoreDB(await utils.getAndDecryptString(IPFSNode, conf.get('backupDB'), publicKey, privateKey));
+  var backupDBVal = await getFile(dbBackupFile);
+  if(backupDBVal) {
+    console.log("RESTORING DB FROM BACKUP:", backupDBVal);
+    await thisDB.restoreDB(await utils.getAndDecryptString(IPFSNode, backupDBVal, publicKey, privateKey));
+  } else {
+    console.log("CREATING NEW DB:", dbBackupFile);
   }
   return thisDB;
 }
@@ -53,7 +86,8 @@ async function backupDB(IPFSNode, currentDB) {
   const {publicKey, privateKey} = await getKeys();
   const backupString = await currentDB.backupDB();
   const IPFSHash = await utils.encryptAndStoreString(IPFSNode, backupString, publicKey, privateKey);
-  conf.set('backupDB', IPFSHash);
+  console.log("BACKING UP DB:", IPFSHash);
+  await saveFile(dbBackupFile, IPFSHash);
 }
 
 //PUBSUB HANDLING
@@ -147,7 +181,7 @@ async function broadcastMessage(messageContents) {
       if (err) {
         console.error(`failed to publish to ${HIVENET_MESSAGES}`, err);
       } else {
-        console.log(`published ${messageContents} to ${HIVENET_MESSAGES}`);
+        console.log(`BROADCASTING: ${messageContents} to ${HIVENET_MESSAGES}`);
         resolve();
       }
 
@@ -166,8 +200,8 @@ async function processMessage(rating, url) {
   if(localDB.checkIfAlreadyRated(publicKey, utils.cleanURL(url))) {
     console.log("Already rated:", url);
   } else {
-    const {IPFSHash, messageContents} = await utils.createMessage(node, url, rating, getLastMessageIPFS(), publicKey, privateKey);
-    setLastMessageIPFS(IPFSHash);
+    const {IPFSHash, messageContents} = await utils.createMessage(node, url, rating, await getLastMessageIPFS(), publicKey, privateKey);
+    await setLastMessageIPFS(IPFSHash);
     const {shouldBlacklist, parsedMessage} = await utils.parseMessage(IPFSHash, messageContents); //should never be blacklist for self
     localDB.addMessage(parsedMessage);
 
@@ -259,6 +293,7 @@ figlet('HIVENET', function(err, data) {
     console.log(data, "\n");
     console.log("Loading IPFS Node....")
     node = new IPFS({
+      repo: FILE_PATH + "/ipfsData",
       EXPERIMENTAL:{ pubsub: true},
       relay:{enabled:true, hop:{enabled:true}},
       config: {
