@@ -4,7 +4,6 @@ const hexToBinary = require('hex-to-binary');
 const bigInt = require("big-integer");
 const url = require('url');
 const cryptr = require('cryptr');
-const workerLib = require('webworker-threads').Worker; //spawned worker
 
 const PROD_DIFFICULTY = 21;
 const GOAL_HASH = 5000;
