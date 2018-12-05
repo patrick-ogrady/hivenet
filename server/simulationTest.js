@@ -4,7 +4,8 @@ const hexToBinary = require('hex-to-binary');
 const bigInt = require("big-integer");
 const IPFS = require('ipfs');
 const simpledb = require('./simpledb.js');
-const utils = require('./utils.js');
+const utilsLib = require('./utils.js');
+var utils = new utilsLib("TEST");
 const agent = require("./agent.js");
 const chaos = require("./chaos.js");
 
@@ -29,7 +30,7 @@ async function performTest(IPFSNode) {
     agents.push(thisAgent);
   }
 
-  var chaosAgent = new chaos(await createAgent());
+  var chaosAgent = new chaos(await createAgent(), utils);
 
 
   //simulate 10 rounds
@@ -64,7 +65,7 @@ async function performTest(IPFSNode) {
         createdMessages.push(await chaosAgent.createRandomBadMessage(IPFSNode));
 
         console.log("CREATING NEW MALICIOUS AGENT IDENTITY!");
-        var chaosAgent = new chaos(await createAgent());
+        var chaosAgent = new chaos(await createAgent(), utils);
 
       }
     }

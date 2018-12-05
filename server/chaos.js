@@ -1,7 +1,7 @@
-const utils = require('./utils.js');
 const crypto2 = require('crypto2');
 
-module.exports = function(agent) {
+module.exports = function(agent, utils) {
+  this.utils = utils; //needed to keep same proof set
   this.seenLastMessageIPFS = null;
   this.seenProofs = null;
   this.personalURLs = null;
@@ -21,7 +21,7 @@ module.exports = function(agent) {
 
   this.createBadMessage = async function(IPFSNode, url, rating, lastMessageIPFS, OVERRIDE_NONCE, OVERRIDE_PROOF, OVERRIDE_MESSAGE_TO_SEND) {
     var rawPayload = {
-      url:utils.cleanURL(url),
+      url:this.utils.cleanURL(url),
       rating:rating
     };
 
@@ -46,7 +46,7 @@ module.exports = function(agent) {
     const isSignatureValid = await crypto2.verify.sha256(payload, this.agent.publicKey, signature);
     // console.log("signature valid:", isSignatureValid, "\n");
 
-    var {proofToUse, verifiedProof} = await utils.storeHashInChainpoint(signedPayloadHash);
+    var {proofToUse, verifiedProof} = await this.utils.storeHashInChainpoint(signedPayloadHash);
     // console.log("signed hash proof:", proofToUse, "\n");
 
     if (OVERRIDE_PROOF) {
@@ -56,7 +56,7 @@ module.exports = function(agent) {
     //calculate nonce
     const proofHash = await crypto2.hash.sha256(proofToUse);
     // console.log("Finding Nonce for:", proofHash);
-    var nonce = await utils.findNonce(proofHash);
+    var nonce = await this.utils.findNonce(proofHash);
     // console.log("Hash Leading Zeros", proofHash, await checkNonce(proofHash, nonce));
 
     if (OVERRIDE_NONCE) {
@@ -75,7 +75,7 @@ module.exports = function(agent) {
 
 
 
-    let IPFSHash = await utils.storeString(IPFSNode, fullMessageToSend);
+    let IPFSHash = await this.utils.storeString(IPFSNode, fullMessageToSend);
     // console.log("MESSAGE IPFS:", IPFSHash);
 
     return {IPFSHash: IPFSHash, messageContents:fullMessageToSend};
@@ -83,7 +83,7 @@ module.exports = function(agent) {
 
   this.createValidMessage = async function(IPFSNode) {
     var thisURL = this.agent.popUnseenURL();
-    var {IPFSHash, messageContents} = await utils.createMessage(IPFSNode, thisURL, this.agent.getRating(), this.agent.lastMessageIPFS, this.agent.publicKey, this.agent.privateKey);
+    var {IPFSHash, messageContents} = await this.utils.createMessage(IPFSNode, thisURL, this.agent.getRating(), this.agent.lastMessageIPFS, this.agent.publicKey, this.agent.privateKey);
     this.personalURLs = thisURL;
     this.agent.lastMessageIPFS = IPFSHash;
     return [IPFSHash, messageContents];

@@ -4,7 +4,8 @@ const Configstore = require('configstore');
 const pkg = require('./package.json');
 const conf = new Configstore(pkg.name);
 const simpledb = require('./simpledb.js');
-const utils = require('./utils.js');
+const utilsLib = require('./utils.js');
+var utils = new utilsLib("PROD");
 
 const express = require('express');
 const bodyParser = require("body-parser");
@@ -68,7 +69,12 @@ var messageQueue = [];
 function processMessageQueue(rating, url) {
   if (!inProcess) {
     console.log("Nothing in process!");
-    processMessage(rating, url);
+    let promise = new Promise((resolve, reject) => {
+      processMessage(rating, url);
+      resolve();
+    });
+
+
   } else {
     console.log("Message in Queue:", messageQueue.length);
     messageQueue.push([rating, url]);

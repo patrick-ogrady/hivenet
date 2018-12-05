@@ -4,7 +4,8 @@ const hexToBinary = require('hex-to-binary');
 const bigInt = require("big-integer");
 const IPFS = require('ipfs');
 const simpledb = require('./simpledb.js');
-const utils = require('./utils.js');
+const utilsLib = require('./utils.js');
+var utils = new utilsLib("TEST");
 const agent = require("./agent.js");
 const chaos = require("./chaos.js");
 
@@ -20,7 +21,7 @@ async function performTest(IPFSNode) {
   var thisAgent = await createAgent();
   console.log("GOOD AGENT:", thisAgent.publicKey);
 
-  var chaosAgent = new chaos(await createAgent());
+  var chaosAgent = new chaos(await createAgent(), utils);
 
 
   //simulate 10 rounds

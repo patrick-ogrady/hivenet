@@ -1,4 +1,3 @@
-
 const crypto2 = require('crypto2');
 const simpledb = require('./simpledb.js');
 var fs = require('fs');

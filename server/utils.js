@@ -5,11 +5,11 @@ const bigInt = require("big-integer");
 const url = require('url');
 const cryptr = require('cryptr');
 
-const setting = "TEST";
-var fakeChainpointProofs = [];
+module.exports = function(MODE){
+  this.setting = MODE; //MODE should be "TEST" or "PROD";
+  this.fakeChainpointProofs = [];
 
-module.exports = {
-  storeString: async function(IPFSNode, inputString) {
+  this.storeString = async function(IPFSNode, inputString) {
     let promise = new Promise((resolve, reject) => {
       IPFSNode.files.add({
         content: Buffer.from(inputString)
@@ -21,15 +21,17 @@ module.exports = {
     let IPFSHash = await promise;
     // console.log("MESSAGE IPFS:", IPFSHash);
     return IPFSHash;
-  },
-  encryptAndStoreString: async function(IPFSNode, inputString, publicKey, privateKey) {
+  }
+
+  this.encryptAndStoreString = async function(IPFSNode, inputString, publicKey, privateKey) {
     const encrypter = new cryptr(privateKey);
     const encryptedString = encrypter.encrypt(inputString);
     let IPFSHash = await this.storeString(IPFSNode, encryptedString);
     console.log("MESSAGE IPFS:", IPFSHash);
     return IPFSHash;
-  },
-  getString: async function (IPFSNode, ipfsAddress) {
+  }
+
+  this.getString = async function (IPFSNode, ipfsAddress) {
     try {
       let promise = new Promise((resolve, reject) => {
         IPFSNode.pin.add(ipfsAddress, function(err) {
@@ -52,9 +54,9 @@ module.exports = {
     } catch (err) {
       return null;
     }
-  },
+  }
 
-  getAndDecryptString: async function(IPFSNode, ipfsAddress, publicKey, privateKey) {
+  this.getAndDecryptString = async function(IPFSNode, ipfsAddress, publicKey, privateKey) {
     try {
       const encrypter = new cryptr(privateKey);
       let IPFSContents = await this.getString(IPFSNode, ipfsAddress);
@@ -64,10 +66,10 @@ module.exports = {
     } catch (err) {
       return null;
     }
-  },
+  }
 
-  storeHashInChainpoint: async function(hashToStore) {
-    if (setting == "PROD") {
+  this.storeHashInChainpoint = async function(hashToStore) {
+    if (this.setting == "PROD") {
       // Submit each hash to three randomly selected Nodes
       let proofHandles = await chp.submitHashes([hashToStore]);
       // console.log("Submitted Proof Objects: Expand objects below to inspect.")
@@ -101,16 +103,16 @@ module.exports = {
       //different nodes return different proofs however all have same anchor id
       return {proofToUse:proofToUse, verifiedProof:verifiedProofs[0]};
     } else {
-      fakeChainpointProofs.push({
+      this.fakeChainpointProofs.push({
         "hashSubmittedCoreAt":(new Date()).toISOString(),
         "hash":hashToStore
       })
-      return {proofToUse:(fakeChainpointProofs.length - 1).toString(), verifiedProof:"YYY"};
+      return {proofToUse:(this.fakeChainpointProofs.length - 1).toString(), verifiedProof:"YYY"};
     }
-  },
+  }
 
-  verifyProofInChainpoint:async function(proof) {
-      if (setting == "PROD") {
+  this.verifyProofInChainpoint = async function(proof) {
+      if (this.setting == "PROD") {
         let verifiedProofs = await chp.verifyProofs([proof])
         // console.log("Verified Proof Objects: Expand objects below to inspect.")
         // console.log(verifiedProofs)
@@ -121,12 +123,17 @@ module.exports = {
           return null;
         }
       } else {
-        return fakeChainpointProofs[parseInt(proof)];
+        return this.fakeChainpointProofs[parseInt(proof)];
       }
-  },
+  }
 
-  findNonce:async function(proofHash) {
-    const difficulty = 5;
+  this.findNonce = async function(proofHash) {
+    var difficulty = 5;
+
+    if (this.setting == "PROD") {
+      difficulty = 25;
+    }
+
     var nonce = bigInt("0");
     var bestLeadingZeros = -1;
     var start = new Date().getTime();
@@ -137,8 +144,8 @@ module.exports = {
         if (bestLeadingZeros >= difficulty) {
           var end = new Date().getTime();
           var time = (end - start);
-          if (time > 0) {
-            // console.log("***FINISHED***","Current Nonce:", nonce.toString(), "Best Leading Zeros:", bestLeadingZeros, "Time Elapsed:", time/1000, "Hash/s:", nonce.divide(time).multiply(1000).toString());
+          if (time > 0 && this.setting == "PROD") {
+            console.log("***FINISHED***","Current Nonce:", nonce.toString(), "Best Leading Zeros:", bestLeadingZeros, "Time Elapsed:", time/1000, "Hash/s:", nonce.divide(time).multiply(1000).toString());
           }
           break;
         }
@@ -146,8 +153,8 @@ module.exports = {
       if (nonce.mod(10000) == 0) {
         var end = new Date().getTime();
         var time = (end - start);
-        if (time > 0) {
-          // console.log("Current Nonce:", nonce.toString(), "Best Leading Zeros:", bestLeadingZeros, "Time Elapsed:", time/1000, "Hash/s:", nonce.divide(time).multiply(1000).toString());
+        if (time > 0 && this.setting == "PROD") {
+          console.log("Current Nonce:", nonce.toString(), "Best Leading Zeros:", bestLeadingZeros, "Time Elapsed:", time/1000, "Hash/s:", nonce.divide(time).multiply(1000).toString());
         }
 
       }
@@ -156,17 +163,17 @@ module.exports = {
     }
 
     return nonce.toString();
-  },
+  }
 
-  checkNonce:async function(proofHash, nonce) {
+  this.checkNonce = async function(proofHash, nonce) {
     const hash = await crypto2.hash.sha256(proofHash + nonce);
     const binaryHash = hexToBinary(hash);
     const leadingZeros = binaryHash.split(1)[0].length;
     return leadingZeros;
-  },
+  }
 
 
-  cleanURL:function(url) {
+  this.cleanURL = function(url) {
     var myURL = new URL(url);
     var toDelete = [];
     for(var key of myURL.searchParams.keys()) {
@@ -181,10 +188,10 @@ module.exports = {
 
     myURL.searchParams.sort();
     return myURL.href;
-  },
+  }
 
   //need two signatures (one for block sent to chainpoint and one to ensure message integrity)
-  createMessage: async function(IPFSNode, url, rating, lastMessageIPFS, publicKey, privateKey) {
+  this.createMessage = async function(IPFSNode, url, rating, lastMessageIPFS, publicKey, privateKey) {
     var rawPayload = {
       url:this.cleanURL(url),
       rating:rating
@@ -233,16 +240,20 @@ module.exports = {
 
     return {IPFSHash: IPFSHash, messageContents:fullMessageToSend};
 
-  },
+  }
 
-  blacklistPeer: async function(publicKey) {
+  this.blacklistPeer = async function(publicKey) {
     if (publicKey != null) {
       console.log("SHOULD BLACKLIST:", publicKey);
     }
-  },
+  }
 
-  parseMessage: async function(messageIPFS, recievedMessage) { //returns null if not valid
-    const difficulty = 5;
+  this.parseMessage = async function(messageIPFS, recievedMessage) { //returns null if not valid
+    var difficulty = 5;
+
+    if (this.setting == "PROD") {
+      difficulty = 25;
+    }
     const parsedMessageTop = JSON.parse(recievedMessage);
 
     //check if valid signature on entire signature (then can blacklist for errors)
@@ -338,8 +349,9 @@ module.exports = {
 
     // console.log("Parsed Message:", toReturn);
     return {shouldBlacklist:null, parsedMessage:toReturn};
-  },
-  pullHistory: async function(IPFSNode, thisAgent, originalPublicKey, nextMessageIPFS) {
+  }
+
+  this.pullHistory =  async function(IPFSNode, thisAgent, originalPublicKey, nextMessageIPFS) {
     if (nextMessageIPFS && nextMessageIPFS != "<none>") {
       var historyPull = nextMessageIPFS;
       console.log("Should Historical Pull:", historyPull);
