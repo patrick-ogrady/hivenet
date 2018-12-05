@@ -6,6 +6,9 @@ const url = require('url');
 const cryptr = require('cryptr');
 const workerLib = require('webworker-threads').Worker; //spawned worker
 
+const PROD_DIFFICULTY = 21;
+const GOAL_HASH = 5000;
+
 module.exports = function(MODE){
   this.setting = MODE; //MODE should be "TEST" or "PROD";
   this.fakeChainpointProofs = [];
@@ -137,8 +140,10 @@ module.exports = function(MODE){
     var difficulty = 5;
 
     if (this.setting == "PROD") {
-      difficulty = 25;
+      difficulty = PROD_DIFFICULTY;
     }
+
+    var defaultBreak = 1000;
 
     var nonce = bigInt("0");
     var bestLeadingZeros = -1;
@@ -157,11 +162,17 @@ module.exports = function(MODE){
         }
       }
       if (nonce.mod(10000) == 0) {
-        await this.sleep(1); //BY FORCING SLEEP GIVES NODE TIME TO ANSWER REQUESTS
         var end = new Date().getTime();
         var time = (end - start);
         if (time > 0 && this.setting == "PROD") {
-          console.log("Current Nonce:", nonce.toString(), "Best Leading Zeros:", bestLeadingZeros, "Time Elapsed:", time/1000, "Hash/s:", nonce.divide(time).multiply(1000).toString());
+          await this.sleep(defaultBreak); //BY FORCING SLEEP GIVES NODE TIME TO ANSWER REQUESTS
+          var hPs = nonce.divide(time).multiply(1000);
+          console.log("Break Time:", defaultBreak, "Current Nonce:", nonce.toString(), "Best Leading Zeros:", bestLeadingZeros, "Time Elapsed:", time/1000, "Hash/s:", hPs.toString());
+          if (hPs > GOAL_HASH) {
+            defaultBreak += 100;
+          } else if (hPs < GOAL_HASH) {
+            defaultBreak -= 100;
+          }
         }
 
       }
@@ -260,7 +271,7 @@ module.exports = function(MODE){
     var difficulty = 5;
 
     if (this.setting == "PROD") {
-      difficulty = 25;
+      difficulty = PROD_DIFFICULTY;
     }
     const parsedMessageTop = JSON.parse(recievedMessage);
 

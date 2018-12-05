@@ -57,7 +57,42 @@ async function backupDB(IPFSNode, currentDB) {
 
 //PUBSUB HANDLING
 const recieveMessage = async (msg) => {
-  console.log("RECIEVED:", msg);
+  console.log("RECIEVED PUBSUB MESSAGE!");
+  const recievedMessage = msg.data.toString();
+  const IPFSHash = await node.add(recievedMessage, {onlyHash:true});
+
+  var {shouldBlacklist, parsedMessage} = await utils.parseMessage(IPFSHash, recievedMessage); //should never be blacklist for self
+  if (shouldBlacklist) {
+    localDB.addBlacklistPeer(shouldBlacklist);
+    return;
+  }
+
+  if (!parsedMessage) {
+    return;
+  }
+
+  var {shouldBlacklist, historyPull, shouldBroadcast} = localDB.addMessage(parsedMessage);
+
+  if (shouldBlacklist) {
+    localDB.addBlacklistPeer(shouldBlacklist);
+    return;
+  }
+
+  //pull history
+  var shouldBlacklist = await utils.pullHistory(IPFSNode, agents[i], parsedMessage.publicKey, historyPull);
+
+  if (shouldBlacklist) {
+    localDB.addBlacklistPeer(shouldBlacklist);
+    return;
+  }
+
+  if (shouldBroadcast) {
+    //useful message...should pin
+    await node.add(recievedMessage);
+    //broadcast
+    await broadcastMessage(recievedMessage);
+  }
+
 };
 
 //MESSAGING QUEUE
@@ -86,6 +121,23 @@ function endProcessMessage() {
   }
 }
 
+async function broadcastMessage(messageContents) {
+  let promise = new Promise((resolve, reject) => {
+    node.pubsub.publish(HIVENET_MESSAGES, Buffer.from(messageContents), (err) => {
+      if (err) {
+        console.error(`failed to publish to ${HIVENET_MESSAGES}`, err);
+      } else {
+        console.log(`published ${messageContents} to ${HIVENET_MESSAGES}`);
+        resolve();
+      }
+
+    });
+  });
+
+  await promise;
+
+}
+
 async function processMessage(rating, url) {
   //do processing
   const {publicKey, privateKey} = await getKeys();
@@ -98,21 +150,10 @@ async function processMessage(rating, url) {
     setLastMessageIPFS(IPFSHash);
     const {shouldBlacklist, parsedMessage} = await utils.parseMessage(IPFSHash, messageContents); //should never be blacklist for self
     localDB.addMessage(parsedMessage);
+
     //broadcast
+    await broadcastMessage(messageContents);
 
-    let promise = new Promise((resolve, reject) => {
-      node.pubsub.publish(HIVENET_MESSAGES, Buffer.from(messageContents), (err) => {
-        if (err) {
-          console.error(`failed to publish to ${HIVENET_MESSAGES}`, err);
-        } else {
-          console.log(`published ${messageContents} to ${HIVENET_MESSAGES}`);
-          resolve();
-        }
-
-      });
-    });
-
-    await promise;
 
     //BACKUP DB
     await backupDB(node, localDB);
