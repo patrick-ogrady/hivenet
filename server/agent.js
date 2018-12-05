@@ -36,7 +36,7 @@ function agent() {
       return this.urls.pop();
     } else {
       this.db.getCountUnseen();
-      var thisRec = this.db.getRecommendation();
+      var thisRec = this.db.getRecommendation([]);
       if (thisRec) {
         console.log("Recommendation:", thisRec.url, "Score:", thisRec.score);
         return thisRec.url;

@@ -149,13 +149,13 @@ const recieveMessage = async (msg) => {
 };
 
 //MESSAGING QUEUE
-var inProcess = false;
+var inProcess = null;
 var messageQueue = [];
 
 function processMessageQueue(rating, url) {
   console.log("RATING:", url, "SCORE:", rating);
   if (!inProcess) {
-    inProcess = true //some chance where race condition in worst case
+    inProcess = url //some chance where race condition in worst case
     // console.log("Nothing in process!");
     processMessage(rating, url);
   } else {
@@ -168,10 +168,11 @@ function endProcessMessage() {
   if (messageQueue.length) {
     // pull out oldest message and process it
     var nextMessage = messageQueue.shift();
+    inProcess = nextMessage[1];
     processMessage(nextMessage[0], nextMessage[1]);
   } else {
     //in the case that there is a race condition something could sit in messaging slightly too long
-    inProcess = false;
+    inProcess = null;
   }
 }
 
@@ -232,31 +233,23 @@ app.post('/rating', async function (req, res) {
   res.status(200).json();
 });
 
-// app.post('/risk', function (req, res) {
-//   res.header("Access-Control-Allow-Origin", "*");
-//   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-//   if (req.body.url == undefined) {
-//     res.status(422).json();
-//     return;
-//   }
-//
-//   // const urlFullAddress = removeParams(req.body.url);
-//   // const urlHostname = extractHostname(req.body.url);
-//   // if (blacklistHostnames.has(urlHostname)) {
-//   //   res.status(200).json({status:"blacklist"});
-//   // } else if (whitelistHostnames.has(urlHostname)){
-//   //   //score
-//   //   res.status(200).json({status:"whitelist"});
-//   // } else {
-//   //   res.status(200).json({status:"unsure"});
-//   // }
-// });
-
 app.get('/recommendation', async function (req, res) {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
 
-  res.status(200).json({url:localDB.getRecommendationExtra()});
+  //pass all current ratings waiting to be added
+  var waitingURLs = [];
+  if (inProcess) {
+    waitingURLs.push(inProcess);
+  }
+
+  for (var i in messageQueue) {
+    waitingURLs.push(messageQueue[i][1]);
+  }
+
+  console.log("ALL WAITING URLS:", waitingURLs);
+
+  res.status(200).json({url:localDB.getRecommendationExtra(waitingURLs)});
 });
 
 
@@ -295,7 +288,7 @@ figlet('HIVENET', function(err, data) {
     node = new IPFS({
       repo: FILE_PATH + "/ipfsData",
       EXPERIMENTAL:{ pubsub: true},
-      relay:{enabled:true, hop:{enabled:true}},
+      // relay:{enabled:true, hop:{enabled:true}},
       config: {
         Addresses: {
           Swarm: [

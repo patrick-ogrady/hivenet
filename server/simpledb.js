@@ -246,7 +246,7 @@ function simpledb(thisPublicKey) {
     return 1 - reputationFor/totalReputation;
   }
 
-  this.calculateRecommendations = function() {
+  this.calculateRecommendations = function(waitingURLs) {
 
     this.recommendations.chain().remove();
 
@@ -279,7 +279,7 @@ function simpledb(thisPublicKey) {
       if (table.containsCell(url_string, this.publicKey) == false) {
         //check risk score
         var riskScore = this.getURLRiskScore(url_string);
-        if(riskScore <= MAX_RISK_TOLERANCE) {
+        if(riskScore <= MAX_RISK_TOLERANCE && !waitingURLs.includes(url_string)) {
           urls_to_view.push(url_string);
           this.recommendations.insert({
             url:url_string,
@@ -295,13 +295,9 @@ function simpledb(thisPublicKey) {
     console.log("URLS TO RECOMMEND:", urls_to_view);
   }
 
-  this.getRecommendation = function() {
-    const selfPublicKey = this.publicKey;
+  this.getRecommendation = function(waitingURLs) {
     //update recommendations
-    if (this.recommendations.chain().data().length == 0) {
-      this.calculateRecommendations(selfPublicKey);
-    }
-
+    this.calculateRecommendations(waitingURLs);
     var resultSet = this.recommendations.chain().simplesort('score').limit(1);
     var resultSetData = resultSet.data();
     if (resultSetData.length > 0) {
@@ -312,8 +308,8 @@ function simpledb(thisPublicKey) {
     }
   }
 
-  this.getRecommendationExtra = function() {
-    var normalRec = this.getRecommendation();
+  this.getRecommendationExtra = function(waitingURLs) {
+    var normalRec = this.getRecommendation(waitingURLs);
     if (!normalRec) { //no available recommendations
       return "https://en.wikipedia.org/wiki/Special:Random"
     } else {
