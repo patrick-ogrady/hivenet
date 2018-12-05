@@ -1,5 +1,6 @@
 const IPFS = require('ipfs');
 var figlet = require('figlet');
+const crypto2 = require('crypto2');
 const Configstore = require('configstore');
 const pkg = require('./package.json');
 const conf = new Configstore(pkg.name);
@@ -59,7 +60,14 @@ async function backupDB(IPFSNode, currentDB) {
 const recieveMessage = async (msg) => {
   console.log("RECIEVED PUBSUB MESSAGE!");
   const recievedMessage = msg.data.toString();
-  const IPFSHash = await node.add(recievedMessage, {onlyHash:true});
+  const IPFSHash = (await node.files.add(Buffer.from(recievedMessage), {onlyHash:true}))[0].hash;
+
+  //SHOULD CHECK TO SEE IF HASH IN DB
+  if (localDB.checkMessageIPFS(IPFSHash)) { //can avoid a lot of work
+    console.log("ALREADY SEEN HASH:", IPFSHash);
+    return;
+  }
+
 
   var {shouldBlacklist, parsedMessage} = await utils.parseMessage(IPFSHash, recievedMessage); //should never be blacklist for self
   if (shouldBlacklist) {
@@ -67,9 +75,11 @@ const recieveMessage = async (msg) => {
     return;
   }
 
-  if (!parsedMessage) {
+  if (parsedMessage == null) {
     return;
   }
+
+  console.log("TRY ADDING:", parsedMessage);
 
   var {shouldBlacklist, historyPull, shouldBroadcast} = localDB.addMessage(parsedMessage);
 
@@ -79,7 +89,7 @@ const recieveMessage = async (msg) => {
   }
 
   //pull history
-  var shouldBlacklist = await utils.pullHistory(IPFSNode, agents[i], parsedMessage.publicKey, historyPull);
+  var shouldBlacklist = await utils.pullHistory(node, localDB, parsedMessage.publicKey, historyPull);
 
   if (shouldBlacklist) {
     localDB.addBlacklistPeer(shouldBlacklist);
@@ -88,7 +98,7 @@ const recieveMessage = async (msg) => {
 
   if (shouldBroadcast) {
     //useful message...should pin
-    await node.add(recievedMessage);
+    await utils.storeString(node, recievedMessage);
     //broadcast
     await broadcastMessage(recievedMessage);
   }

@@ -66,7 +66,7 @@ module.exports = function(MODE){
       const encrypter = new cryptr(privateKey);
       let IPFSContents = await this.getString(IPFSNode, ipfsAddress);
       const decryptedFile = encrypter.decrypt(IPFSContents);
-      console.log("Decrypted MESSAGE IPFS Contents:", decryptedFile);
+      // console.log("Decrypted MESSAGE IPFS Contents:", decryptedFile);
       return decryptedFile;
     } catch (err) {
       return null;
@@ -370,12 +370,12 @@ module.exports = function(MODE){
     return {shouldBlacklist:null, parsedMessage:toReturn};
   }
 
-  this.pullHistory =  async function(IPFSNode, thisAgent, originalPublicKey, nextMessageIPFS) {
+  this.pullHistory =  async function(IPFSNode, thisDB, originalPublicKey, nextMessageIPFS) {
     if (nextMessageIPFS && nextMessageIPFS != "<none>") {
       var historyPull = nextMessageIPFS;
       console.log("Should Historical Pull:", historyPull);
       while (historyPull != null && historyPull != "<none>") {
-        if (thisAgent.db.checkMessageIPFS(historyPull) == false) {
+        if (thisDB.checkMessageIPFS(historyPull) == false) {
           var fileContents = await this.getString(IPFSNode, historyPull);
           var {shouldBlacklist, parsedMessage} = await this.parseMessage(historyPull, fileContents);
           if (shouldBlacklist) {
@@ -385,13 +385,13 @@ module.exports = function(MODE){
             console.log("History stealing!");
             return originalPublicKey;
           }
-          var {shouldBlacklist, historyPull} = thisAgent.db.addMessage(parsedMessage);
+          var {shouldBlacklist, historyPull} = thisDB.addMessage(parsedMessage);
           if (shouldBlacklist) {
             return originalPublicKey;
           }
         } else {
           //need to check to ensure no history mutation in case message already saved
-          if (originalPublicKey != thisAgent.db.getMessageIPFS(historyPull).publicKey) {
+          if (originalPublicKey != thisDB.getMessageIPFS(historyPull).publicKey) {
             console.log("History stealing!");
             return originalPublicKey;
           }

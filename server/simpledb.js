@@ -3,6 +3,8 @@ const loki = require('lokijs');
 const cryptr = require('cryptr');
 const jsrecommender = require("./jsrecommender");
 
+const MAX_RISK_TOLERANCE = 0.5;
+
 function simpledb(thisPublicKey) {
   this.publicKey = thisPublicKey;
   this.lokiDB = new loki('sandbox');
@@ -255,9 +257,16 @@ function simpledb(thisPublicKey) {
     var recommender = new jsrecommender.Recommender();
     var table = new jsrecommender.Table();
 
+    var {peerReputations, totalReputation} = this.getPeerReputations()
+
     for (rating in applicableRatings) {
       var thisRating = applicableRatings[rating];
-      table.setCell(thisRating.url, thisRating.publicKey, thisRating.rating);
+      if (peerReputations[thisRating.publicKey] >= 1 || this.publicKey == thisRating.publicKey) {
+        table.setCell(thisRating.url, thisRating.publicKey, thisRating.rating);
+      } else {
+        // console.log("Don't consider recommendations from:", thisRating.publicKey);
+      }
+
     }
 
     var model = recommender.fit(table);
@@ -268,10 +277,17 @@ function simpledb(thisPublicKey) {
     for (var j = 0; j < predicted_table.rowNames.length; ++j) {
       var url_string = predicted_table.rowNames[j];
       if (table.containsCell(url_string, this.publicKey) == false) {
-        this.recommendations.insert({
-          url:url_string,
-          score:predicted_table.getCell(url_string, this.publicKey)
-        });
+        //check risk score
+        var riskScore = this.getURLRiskScore(url_string);
+        if(riskScore <= MAX_RISK_TOLERANCE) {
+          this.recommendations.insert({
+            url:url_string,
+            score:predicted_table.getCell(url_string, this.publicKey)
+          });
+        } else {
+          console.log(url_string, " TO RISKY TO RECOMMEND!:", riskScore);
+        }
+
       }
     }
   }

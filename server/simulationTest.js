@@ -61,7 +61,7 @@ async function performTest(IPFSNode) {
     if (SHOUD_ATTACK) {
       //send messages from malicious agent with valid signature
       createdMessages.push(await chaosAgent.createValidMessage(IPFSNode));
-      if (Math.random() > 0.4) {
+      if (Math.random() > 0.8) {
         createdMessages.push(await chaosAgent.createRandomBadMessage(IPFSNode));
 
         console.log("CREATING NEW MALICIOUS AGENT IDENTITY!");
@@ -77,6 +77,13 @@ async function performTest(IPFSNode) {
       var i;
       for (i = 0; i < agents.length; i++) {
         if (Math.random() > 0.5) {
+          //check to see if already in history
+          if (agents[i].db.checkMessageIPFS(thisMessage[0])) { //can avoid a lot of work
+            console.log("ALREADY SEEN", thisMessage[0]);
+            continue
+          }
+
+
           //NEED TO CONSIDER PULLING HISTORY
           var {shouldBlacklist, parsedMessage} = await utils.parseMessage(thisMessage[0], thisMessage[1]); //should never be blacklist for self
           if (shouldBlacklist) {
@@ -96,7 +103,7 @@ async function performTest(IPFSNode) {
           }
 
           //pull history
-          var shouldBlacklist = await utils.pullHistory(IPFSNode, agents[i], parsedMessage.publicKey, historyPull);
+          var shouldBlacklist = await utils.pullHistory(IPFSNode, agents[i].db, parsedMessage.publicKey, historyPull);
 
           if (shouldBlacklist) {
             agents[i].db.addBlacklistPeer(shouldBlacklist);

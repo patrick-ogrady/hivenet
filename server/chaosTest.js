@@ -37,7 +37,7 @@ async function checkBlacklist(IPFSNode, thisAgent, thisMessage) {
   }
 
   //pull history -> if message in DB should check to make sure same owner
-  var shouldBlacklist = await utils.pullHistory(IPFSNode, thisAgent, parsedMessage.publicKey, historyPull);
+  var shouldBlacklist = await utils.pullHistory(IPFSNode, thisAgent.db, parsedMessage.publicKey, historyPull);
   if (shouldBlacklist) {
     thisAgent.db.addBlacklistPeer(shouldBlacklist);
     return true;
