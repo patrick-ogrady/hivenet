@@ -103,6 +103,15 @@ const recieveMessage = async (msg) => {
     await broadcastMessage(recievedMessage);
   }
 
+  //SHOW REPUTATION
+  console.log(localDB.getCountUnseen());
+
+  console.log("reputations:", localDB.getPeerReputations());
+  //get blacklisted peers
+  console.log("blacklist:", localDB.getAllBlacklistedPeers());
+
+  //SHOW UNSEEN URLS
+
 };
 
 //MESSAGING QUEUE

@@ -280,6 +280,7 @@ function simpledb(thisPublicKey) {
         //check risk score
         var riskScore = this.getURLRiskScore(url_string);
         if(riskScore <= MAX_RISK_TOLERANCE) {
+          urls_to_view.push(url_string);
           this.recommendations.insert({
             url:url_string,
             score:predicted_table.getCell(url_string, this.publicKey)
@@ -290,6 +291,8 @@ function simpledb(thisPublicKey) {
 
       }
     }
+
+    console.log("URLS TO RECOMMEND:", urls_to_view);
   }
 
   this.getRecommendation = function() {
@@ -303,7 +306,7 @@ function simpledb(thisPublicKey) {
     var resultSetData = resultSet.data();
     if (resultSetData.length > 0) {
       resultSet.remove()
-      return resultSetData[0];
+      return resultSetData[0].url;
     } else {
       return null;
     }
@@ -313,6 +316,8 @@ function simpledb(thisPublicKey) {
     var normalRec = this.getRecommendation();
     if (!normalRec) { //no available recommendations
       return "https://en.wikipedia.org/wiki/Special:Random"
+    } else {
+      return normalRec;
     }
   }
 }
