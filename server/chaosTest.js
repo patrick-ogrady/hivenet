@@ -8,12 +8,42 @@ const utilsLib = require('./utils.js');
 var utils = new utilsLib("TEST");
 const agent = require("./agent.js");
 const chaos = require("./chaos.js");
+var assert = require('assert');
 
 
 async function createAgent() {
   var agentInstance = new agent();
   await agentInstance.initialize();
   return agentInstance;
+}
+
+async function checkBlacklist(IPFSNode, thisAgent, thisMessage) {
+  //NEED TO CONSIDER PULLING HISTORY
+  var {shouldBlacklist, parsedMessage} = await utils.parseMessage(thisMessage[0], thisMessage[1]); //should never be blacklist for self
+  if (shouldBlacklist) {
+    thisAgent.db.addBlacklistPeer(shouldBlacklist);
+    return true;
+  }
+
+  if (!parsedMessage) {
+    return false;
+  }
+
+  var {shouldBlacklist, historyPull, shouldBroadcast} = thisAgent.db.addMessage(parsedMessage);
+
+  if (shouldBlacklist) {
+    thisAgent.db.addBlacklistPeer(shouldBlacklist);
+    return true;
+  }
+
+  //pull history -> if message in DB should check to make sure same owner
+  var shouldBlacklist = await utils.pullHistory(IPFSNode, thisAgent, parsedMessage.publicKey, historyPull);
+  if (shouldBlacklist) {
+    thisAgent.db.addBlacklistPeer(shouldBlacklist);
+    return true;
+  }
+
+  return false;
 }
 
 async function performTest(IPFSNode) {
@@ -47,57 +77,39 @@ async function performTest(IPFSNode) {
     y += 1;
   }
 
-  createdMessages.push(await chaosAgent.createValidMessage(IPFSNode));
-  createdMessages.push(await chaosAgent.createBadNonceMessage(IPFSNode));
-  createdMessages.push(await chaosAgent.createValidMessage(IPFSNode));
-  createdMessages.push(await chaosAgent.createBadRatingMessage(IPFSNode));
-  createdMessages.push(await chaosAgent.createValidMessage(IPFSNode));
-  createdMessages.push(await chaosAgent.createBadProofMessage(IPFSNode));
-  createdMessages.push(await chaosAgent.createValidMessage(IPFSNode));
-  createdMessages.push(await chaosAgent.createDuplicateRatingMessage(IPFSNode));
-  createdMessages.push(await chaosAgent.createValidMessage(IPFSNode));
-  createdMessages.push(await chaosAgent.createHistoryMutationMessage(IPFSNode));
-  createdMessages.push(await chaosAgent.createValidMessage(IPFSNode));
-  createdMessages.push(await chaosAgent.createCopyInteriorMessage(IPFSNode));
-  createdMessages.push(await chaosAgent.createValidMessage(IPFSNode));
-  createdMessages.push(await chaosAgent.createStealHistoryMessage(IPFSNode));
-  createdMessages.push(await chaosAgent.createValidMessage(IPFSNode));
+  await checkBlacklist(IPFSNode, thisAgent, await chaosAgent.createValidMessage(IPFSNode));
 
-  var shouldBlacklistCount = 0;
-  while(createdMessages.length > 0) {
-    thisAgent.db.clearBlacklist();
-    var thisMessage = createdMessages.pop();
+  const backupString = await thisAgent.db.backupDB()
 
-    //NEED TO CONSIDER PULLING HISTORY
-    var {shouldBlacklist, parsedMessage} = await utils.parseMessage(thisMessage[0], thisMessage[1]); //should never be blacklist for self
-    if (shouldBlacklist) {
-      shouldBlacklistCount += 1;
-      thisAgent.db.addBlacklistPeer(shouldBlacklist);
-      continue;
-    }
 
-    if (!parsedMessage) {
-      continue
-    }
+  //BAD NONCE
+  assert(await checkBlacklist(IPFSNode, thisAgent, await chaosAgent.createBadNonceMessage(IPFSNode)));
+  await thisAgent.db.restoreDB(backupString);
 
-    var {shouldBlacklist, historyPull, shouldBroadcast} = thisAgent.db.addMessage(parsedMessage);
+  //BAD RATING
+  assert(await checkBlacklist(IPFSNode, thisAgent, await chaosAgent.createBadRatingMessage(IPFSNode)));
+  await thisAgent.db.restoreDB(backupString);
 
-    if (shouldBlacklist) {
-      shouldBlacklistCount += 1
-      thisAgent.db.addBlacklistPeer(shouldBlacklist);
-      continue
-    }
+  //BAD PROOF
+  assert(await checkBlacklist(IPFSNode, thisAgent, await chaosAgent.createBadProofMessage(IPFSNode)));
+  await thisAgent.db.restoreDB(backupString);
 
-    //pull history -> if message in DB should check to make sure same owner
-    var shouldBlacklist = await utils.pullHistory(IPFSNode, thisAgent, parsedMessage.publicKey, historyPull);
-    if (shouldBlacklist) {
-      shouldBlacklistCount += 1
-      thisAgent.db.addBlacklistPeer(shouldBlacklist);
-      continue
-    }
-  }
+  //DUPLICATE RATING
+  assert(await checkBlacklist(IPFSNode, thisAgent, await chaosAgent.createDuplicateRatingMessage(IPFSNode)));
+  await thisAgent.db.restoreDB(backupString);
 
-  console.log("BLACKLIST COUNT:", shouldBlacklistCount); //SHOULD EQUAL 12 BECAUSE HISTORY SHOULD LEAD TO BLACKLIST AFTER CLEARING
+  //HISTORY MUTATION
+  assert(await checkBlacklist(IPFSNode, thisAgent, await chaosAgent.createHistoryMutationMessage(IPFSNode)));
+  await thisAgent.db.restoreDB(backupString);
+
+  //COPIED INTERIOR MESSAGE
+  assert(await checkBlacklist(IPFSNode, thisAgent, await chaosAgent.createCopyInteriorMessage(IPFSNode)));
+  await thisAgent.db.restoreDB(backupString);
+
+  //STEAL HISTORY
+  assert(await checkBlacklist(IPFSNode, thisAgent, await chaosAgent.createStealHistoryMessage(IPFSNode)));
+  await thisAgent.db.restoreDB(backupString);
+
 
 }
 

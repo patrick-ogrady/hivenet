@@ -24,7 +24,8 @@
     "lokijs": "^1.5.5",
     "opn": "^5.4.0",
     "random-key": "^0.3.2",
-    "randomstring": "^1.1.5"
+    "randomstring": "^1.1.5",
+    "webworker-threads": "^0.7.17"
   },
   "bin": {
     "hivenet": "./index.js"

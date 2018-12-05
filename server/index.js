@@ -14,13 +14,11 @@ app.use(bodyParser.json());
 
 async function getKeys() {
   if (conf.has('publicKey') == false) {
-    console.log("CREATING KEY PAIRS");
+    // console.log("CREATING KEY PAIRS");
     const { privateKey, publicKey } = await crypto2.createKeyPair();
     conf.set('publicKey', publicKey);
     conf.set('privateKey', privateKey);
     console.log("Public Key:", publicKey, "\n");
-  } else {
-    console.log("KEY PAIRS ALREADY EXIST");
   }
 
   return {publicKey:conf.get('publicKey'), privateKey:conf.get('privateKey')};
@@ -45,7 +43,7 @@ async function initDB(IPFSNode) {
   const {publicKey, privateKey} = await getKeys();
   var thisDB = new simpledb(publicKey);
   if(conf.has('backupDB')) {
-    thisDB.restoreDB(await utils.getAndDecryptString(IPFSNode, conf.get('backupDB'), publicKey, privateKey));
+    await thisDB.restoreDB(await utils.getAndDecryptString(IPFSNode, conf.get('backupDB'), publicKey, privateKey));
   }
   return thisDB;
 }
@@ -68,13 +66,9 @@ var messageQueue = [];
 
 function processMessageQueue(rating, url) {
   if (!inProcess) {
+    inProcess = true //some chance where race condition in worst case
     console.log("Nothing in process!");
-    let promise = new Promise((resolve, reject) => {
-      processMessage(rating, url);
-      resolve();
-    });
-
-
+    processMessage(rating, url);
   } else {
     console.log("Message in Queue:", messageQueue.length);
     messageQueue.push([rating, url]);

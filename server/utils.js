@@ -4,10 +4,12 @@ const hexToBinary = require('hex-to-binary');
 const bigInt = require("big-integer");
 const url = require('url');
 const cryptr = require('cryptr');
+const workerLib = require('webworker-threads').Worker; //spawned worker
 
 module.exports = function(MODE){
   this.setting = MODE; //MODE should be "TEST" or "PROD";
   this.fakeChainpointProofs = [];
+
 
   this.storeString = async function(IPFSNode, inputString) {
     let promise = new Promise((resolve, reject) => {
@@ -82,7 +84,7 @@ module.exports = function(MODE){
       // Retrieve a Calendar proof for each hash that was submitted
       let proofs = await chp.getProofs(proofHandles)
       // console.log("Proof Objects: Expand objects below to inspect.")
-      // console.log(proofs)
+      console.log(proofs);
 
       let proofToUse = null;
       for (i in proofs) {
@@ -93,12 +95,12 @@ module.exports = function(MODE){
       }
 
       // console.log("Single Proof Selected")
-      // console.log(proofToUse);
+      console.log(proofToUse);
 
       // Verify every anchor in every Calendar proof
       let verifiedProofs = await chp.verifyProofs([proofToUse])
       // console.log("Verified Proof Objects: Expand objects below to inspect.")
-      // console.log(verifiedProofs)
+      console.log(verifiedProofs);
 
       //different nodes return different proofs however all have same anchor id
       return {proofToUse:proofToUse, verifiedProof:verifiedProofs[0]};
@@ -127,6 +129,10 @@ module.exports = function(MODE){
       }
   }
 
+  this.sleep = function(millis) {
+    return new Promise(resolve => setTimeout(resolve, millis));
+  }
+
   this.findNonce = async function(proofHash) {
     var difficulty = 5;
 
@@ -151,6 +157,7 @@ module.exports = function(MODE){
         }
       }
       if (nonce.mod(10000) == 0) {
+        await this.sleep(1); //BY FORCING SLEEP GIVES NODE TIME TO ANSWER REQUESTS
         var end = new Date().getTime();
         var time = (end - start);
         if (time > 0 && this.setting == "PROD") {
@@ -224,6 +231,7 @@ module.exports = function(MODE){
     //calculate nonce
     const proofHash = await crypto2.hash.sha256(proofToUse);
     // console.log("Finding Nonce for:", proofHash);
+
     const nonce = await this.findNonce(proofHash);
     // console.log("Hash Leading Zeros", proofHash, await checkNonce(proofHash, nonce));
 
