@@ -74,8 +74,6 @@ function simpledb(thisPublicKey) {
     this.importBackupArray(this.messages, parsedDB.messages);
     this.importBackupArray(this.blacklistPeers, parsedDB.blacklistPeers);
     this.importBackupArray(this.recommendations, parsedDB.recommendations);
-
-
   }
 
   //DB OPS
@@ -292,6 +290,13 @@ function simpledb(thisPublicKey) {
       return resultSetData[0];
     } else {
       return null;
+    }
+  }
+
+  this.getRecommendationExtra = function() {
+    var normalRec = this.getRecommendation();
+    if (!normalRec) { //no available recommendations
+      return "https://en.wikipedia.org/wiki/Special:Random"
     }
   }
 }

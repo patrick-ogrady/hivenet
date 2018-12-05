@@ -3,6 +3,7 @@ const crypto2 = require('crypto2');
 const hexToBinary = require('hex-to-binary');
 const bigInt = require("big-integer");
 const url = require('url');
+const cryptr = require('cryptr');
 
 const setting = "TEST";
 var fakeChainpointProofs = [];
@@ -24,7 +25,7 @@ module.exports = {
   encryptAndStoreString: async function(IPFSNode, inputString, publicKey, privateKey) {
     const encrypter = new cryptr(privateKey);
     const encryptedString = encrypter.encrypt(inputString);
-    let IPFSHash = await storeString(IPFSNode, encryptedString);
+    let IPFSHash = await this.storeString(IPFSNode, encryptedString);
     console.log("MESSAGE IPFS:", IPFSHash);
     return IPFSHash;
   },
