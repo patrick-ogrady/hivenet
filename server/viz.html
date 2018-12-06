@@ -1,0 +1,119 @@
+<html>
+<head>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
+    <script
+    src="https://code.jquery.com/jquery-3.3.1.min.js"
+    integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+    crossorigin="anonymous"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css" rel="stylesheet" type="text/css" />
+
+    <style type="text/css">
+        #mynetwork {
+            width: 1000px;
+            height: 600px;
+            border: 1px solid lightgray;
+        }
+    </style>
+</head>
+<body>
+<div id="mynetwork"></div>
+
+
+
+<script type="text/javascript">
+
+    function addNode() {
+        try {
+            nodes.add({
+                id: 6,
+                label: 'Node 6'
+            });
+        }
+        catch (err) {
+            alert(err);
+        }
+    }
+
+    function setColorNode() {
+        try {
+            nodes.update({
+                id: 6,
+                color: 'red'
+            });
+        }
+        catch (err) {
+            alert(err);
+        }
+    }
+
+    function addEdge() {
+        try {
+            edges.add({
+                id:6,
+                from: 5,
+                to: 6,
+                width:10
+            });
+        }
+        catch (err) {
+            alert(err);
+        }
+    }
+
+    function removeEdge() {
+        try {
+            edges.remove({
+              id:6
+            });
+        }
+        catch (err) {
+            alert(err);
+        }
+    }
+
+
+    // create an array with nodes
+    var nodes = new vis.DataSet([
+        {id: 1, label: 'Node 1'},
+        {id: 2, label: 'Node 2'},
+        {id: 3, label: 'Node 3'},
+        {id: 4, label: 'Node 4'},
+        {id: 5, label: 'Node 5'}
+    ]);
+
+    // create an array with edges
+    var edges = new vis.DataSet([
+        {from: 1, to: 3},
+        {from: 1, to: 2},
+        {from: 2, to: 4},
+        {from: 2, to: 5}
+    ]);
+
+    // create a network
+    var container = document.getElementById('mynetwork');
+
+    // provide the data in the vis format
+    var data = {
+        nodes: nodes,
+        edges: edges
+    };
+    var options = {};
+
+    // initialize your network!
+    var network = new vis.Network(container, data, options);
+    window.setInterval(function(){
+      $.get( "http://localhost:3001/status", function( data ) {
+        console.log(data);
+      });
+    }, 500);
+
+</script>
+
+<button id="node-add" onclick="addNode();">Add Node</button>
+<button id="node-add" onclick="addEdge();">Add Edge</button>
+<button id="node-add" onclick="setColorNode();">Change Color</button>
+<button id="node-add" onclick="removeEdge();">Remove Edge</button>
+
+
+</body>
+</html>

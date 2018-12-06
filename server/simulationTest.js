@@ -9,6 +9,20 @@ var utils = new utilsLib("TEST");
 const agent = require("./agent.js");
 const chaos = require("./chaos.js");
 
+const express = require('express');
+const bodyParser = require("body-parser");
+var app = express();
+app.use(bodyParser.json());
+app.get('/status', async function (req, res) {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  res.status(200).json({url:"test"});
+});
+
+app.get('/', function(req, res) {
+    res.sendfile(__dirname + '/viz.html');
+});
+
 //CONSTANTS
 const SHOUD_ATTACK = true;
 
@@ -162,5 +176,7 @@ const node = new IPFS({
 });
 
 node.on('ready', async () => {
-  performTest(node);
+  app.listen(3001);
+  console.log("API now listening on Port 3001");
+  // performTest(node);
 });
