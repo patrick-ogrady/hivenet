@@ -75,7 +75,14 @@ async function initDB(IPFSNode) {
   var backupDBVal = await getFile(dbBackupFile);
   if(backupDBVal) {
     console.log("RESTORING DB FROM BACKUP:", backupDBVal);
-    await thisDB.restoreDB(await utils.getAndDecryptString(IPFSNode, backupDBVal, publicKey, privateKey));
+    const backupData = await utils.getAndDecryptString(IPFSNode, backupDBVal, publicKey, privateKey);
+    if (backupData) {
+      await thisDB.restoreDB(backupData);
+    } else {
+      console.log("COULD NOT RESTORE FROM BACKUP!");
+      console.log("Delete files in runtime environment to reset!");
+      process.exit();
+    }
   } else {
     console.log("CREATING NEW DB:", dbBackupFile);
   }

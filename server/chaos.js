@@ -1,4 +1,5 @@
 const crypto2 = require('crypto2');
+const randomstring = require("randomstring");
 
 module.exports = function(agent, utils) {
   this.utils = utils; //needed to keep same proof set
@@ -131,6 +132,21 @@ module.exports = function(agent, utils) {
     return [IPFSHash, messageContents];
   }
 
+  this.createUnreachableIPFSAddress = async function(IPFSNode) {
+    const thisRandom = randomstring.generate(64);
+    console.log("Randomly Generated String:", thisRandom);
+    const unreachableIPFS = (await IPFSNode.files.add(Buffer.from(thisRandom), {onlyHash:true}))[0].hash;
+    var {IPFSHash, messageContents} = await this.createBadMessage(IPFSNode, this.agent.popUnseenURL(), this.agent.getRating(), unreachableIPFS, null, null, null);
+    this.agent.lastMessageIPFS = IPFSHash;
+    return [IPFSHash, messageContents];
+  }
+
+  this.createInvalidIPFSAddress = async function(IPFSNode) {
+    var {IPFSHash, messageContents} = await this.createBadMessage(IPFSNode, this.agent.popUnseenURL(), this.agent.getRating(), "ajsdkljaskldj", null, null, null);
+    this.agent.lastMessageIPFS = IPFSHash;
+    return [IPFSHash, messageContents];
+  }
+
   this.createRandomBadMessage = async function(IPFSNode) {
     var typeAttack = Math.floor((Math.random() * 7));
     if (typeAttack == 0) {
@@ -147,6 +163,8 @@ module.exports = function(agent, utils) {
       return await this.createDuplicateRatingMessage(IPFSNode);
     } else if (typeAttack == 6) {
       return await this.createCopyInteriorMessage(IPFSNode);
+    } else if (typeAttack == 7) {
+      return await this.createInvalidIPFSAddress(IPFSNode);
     }
   }
   //different attack modifications

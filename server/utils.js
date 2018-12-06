@@ -7,6 +7,8 @@ const cryptr = require('cryptr');
 const PROD_DIFFICULTY = 15;
 const GOAL_HASH = 5000;
 
+const IPFS_TIMEOUT = 10000; //10 seconds
+
 module.exports = function(MODE){
   this.setting = MODE; //MODE should be "TEST" or "PROD";
   this.fakeChainpointProofs = [];
@@ -37,14 +39,24 @@ module.exports = function(MODE){
   this.getString = async function (IPFSNode, ipfsAddress) {
     try {
       let promise = new Promise((resolve, reject) => {
+        //create timeout
+        var timer = setTimeout(function(){
+          console.log("MISSING IPFS:", ipfsAddress);
+          reject(new Error("promise timeout"));
+        }, IPFS_TIMEOUT);
+
+
         IPFSNode.pin.add(ipfsAddress, function(err) {
           if (err) {
+            clearTimeout(timer);
             reject(err);
           } else {
             IPFSNode.files.cat(ipfsAddress, function(err, file) {
               if (err) {
+                clearTimeout(timer);
                 reject(err);
               } else {
+                clearTimeout(timer);
                 resolve(file.toString());
               }
             });
@@ -53,19 +65,29 @@ module.exports = function(MODE){
       });
       let IPFSContents = await promise;
       // console.log("MESSAGE IPFS Contents:", IPFSContents);
-      return IPFSContents;
+      return {getContents:IPFSContents, shouldBlacklistIPFS:false};
     } catch (err) {
-      return null;
+      if (err.toString().includes("invalid ipfs ref path")) {
+        //SHOULD BLACKLIST
+        return {getContents:null, shouldBlacklistIPFS:true};
+      } else {
+        return {getContents:null, shouldBlacklistIPFS:false};
+      }
     }
   }
 
   this.getAndDecryptString = async function(IPFSNode, ipfsAddress, publicKey, privateKey) {
     try {
       const encrypter = new cryptr(privateKey);
-      let IPFSContents = await this.getString(IPFSNode, ipfsAddress);
-      const decryptedFile = encrypter.decrypt(IPFSContents);
-      // console.log("Decrypted MESSAGE IPFS Contents:", decryptedFile);
-      return decryptedFile;
+      const {getContents, shouldBlacklistIPFS} = await this.getString(IPFSNode, ipfsAddress);
+      if (getContents) {
+        const decryptedFile = encrypter.decrypt(IPFSContents);
+        // console.log("Decrypted MESSAGE IPFS Contents:", decryptedFile);
+        return decryptedFile;
+      } else {
+        return null;
+      }
+
     } catch (err) {
       return null;
     }
@@ -374,8 +396,17 @@ module.exports = function(MODE){
       console.log("Should Historical Pull:", historyPull);
       while (historyPull != null && historyPull != "<none>") {
         if (thisDB.checkMessageIPFS(historyPull) == false) {
-          var fileContents = await this.getString(IPFSNode, historyPull);
-          var {shouldBlacklist, parsedMessage} = await this.parseMessage(historyPull, fileContents);
+          const {getContents, shouldBlacklistIPFS} = await this.getString(IPFSNode, historyPull);
+          if (!getContents) {
+            if (shouldBlacklistIPFS) {
+              return originalPublicKey;
+            } else {
+              console.log("Historical Pull Aborted!");
+              break;
+            }
+
+          }
+          var {shouldBlacklist, parsedMessage} = await this.parseMessage(historyPull, getContents);
           if (shouldBlacklist) {
             return originalPublicKey;
           }

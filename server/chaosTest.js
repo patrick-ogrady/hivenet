@@ -110,6 +110,14 @@ async function performTest(IPFSNode) {
   assert(await checkBlacklist(IPFSNode, thisAgent, await chaosAgent.createStealHistoryMessage(IPFSNode)));
   await thisAgent.db.restoreDB(backupString);
 
+  //UNREACHABLE IPFS ADDRESS (no way to know if valid and unreachable or unreachable -> should not mark as blacklist)
+  assert(await checkBlacklist(IPFSNode, thisAgent, await chaosAgent.createUnreachableIPFSAddress(IPFSNode)) == false);
+  await thisAgent.db.restoreDB(backupString);
+
+  //Invalid IPFS ADDRESS (should be blacklist)
+  assert(await checkBlacklist(IPFSNode, thisAgent, await chaosAgent.createInvalidIPFSAddress(IPFSNode)));
+  await thisAgent.db.restoreDB(backupString);
+
 
 }
 
