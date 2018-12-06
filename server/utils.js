@@ -67,6 +67,7 @@ module.exports = function(MODE){
       // console.log("MESSAGE IPFS Contents:", IPFSContents);
       return {getContents:IPFSContents, shouldBlacklistIPFS:false};
     } catch (err) {
+      console.log(err);
       if (err.toString().includes("invalid ipfs ref path")) {
         //SHOULD BLACKLIST
         return {getContents:null, shouldBlacklistIPFS:true};
@@ -80,8 +81,9 @@ module.exports = function(MODE){
     try {
       const encrypter = new cryptr(privateKey);
       const {getContents, shouldBlacklistIPFS} = await this.getString(IPFSNode, ipfsAddress);
+
       if (getContents) {
-        const decryptedFile = encrypter.decrypt(IPFSContents);
+        const decryptedFile = await encrypter.decrypt(getContents);
         // console.log("Decrypted MESSAGE IPFS Contents:", decryptedFile);
         return decryptedFile;
       } else {
