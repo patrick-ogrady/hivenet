@@ -1,9 +1,11 @@
 // function constructor
 const loki = require('lokijs');
 const cryptr = require('cryptr');
+var wget = require('node-wget');
 const jsrecommender = require("./jsrecommender");
 
 const MAX_RISK_TOLERANCE = 0.5;
+const RANDOM_TRY_PEER = 0.0;//0.25;
 
 function simpledb(thisPublicKey) {
   this.publicKey = thisPublicKey;
@@ -139,6 +141,7 @@ function simpledb(thisPublicKey) {
       }
     }
     console.log("allUnseenURLs URLs:", urlsUnSeen);
+    return urlsUnSeen;
 
   }
 
@@ -239,7 +242,7 @@ function simpledb(thisPublicKey) {
         reputationFor += peerReputations[key];
       }
     }
-    if (totalReputation == 0) {
+    if (totalReputation <= 5) { //ENSURE THAT HAVE OBSERVED ENOUGH PEERS FOR SUFFICIENT REPUTATION
       return 1;
     }
 
@@ -286,7 +289,7 @@ function simpledb(thisPublicKey) {
             score:predicted_table.getCell(url_string, this.publicKey)
           });
         } else {
-          console.log(url_string, " TO RISKY TO RECOMMEND!:", riskScore);
+          console.log(url_string, " TOO RISKY TO RECOMMEND!:", riskScore);
         }
 
       }
@@ -295,7 +298,22 @@ function simpledb(thisPublicKey) {
     console.log("URLS TO RECOMMEND:", urls_to_view);
   }
 
-  this.getRecommendation = function(waitingURLs) {
+  this.getRandomURLFromWikipedia = async function() {
+    let promise = new Promise((resolve, reject) => {
+      wget("https://en.wikipedia.org/w/api.php?action=query&generator=random&grnnamespace=0&format=json&grnlimit=1", function (error, response, body) {
+        var urls = JSON.parse(body)["query"]["pages"];
+        var toKeep = [];
+        for (var pageID in urls) {
+          toKeep.push("https://en.wikipedia.org/wiki?curid=" + pageID);
+        }
+        resolve(toKeep);
+      });
+    });
+
+    return (await promise)[0];
+  }
+
+  this.getRecommendation = async function(waitingURLs) {
     //update recommendations
     this.calculateRecommendations(waitingURLs);
     var resultSet = this.recommendations.chain().simplesort('score').limit(1);
@@ -304,16 +322,14 @@ function simpledb(thisPublicKey) {
       resultSet.remove()
       return resultSetData[0].url;
     } else {
-      return null;
-    }
-  }
-
-  this.getRecommendationExtra = function(waitingURLs) {
-    var normalRec = this.getRecommendation(waitingURLs);
-    if (!normalRec) { //no available recommendations
-      return "https://en.wikipedia.org/wiki/Special:Random"
-    } else {
-      return normalRec;
+      var unseenURLs = this.getCountUnseen();
+      if (unseenURLs.length > 0 && Math.random() < RANDOM_TRY_PEER) {
+        return unseenURLs[Math.floor(Math.random() * unseenURLs.length)];
+      } else {
+        var randWiki = await this.getRandomURLFromWikipedia();
+        console.log("RANDOM WIKI ARTICLE");
+        return randWiki;
+      }
     }
   }
 }

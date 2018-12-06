@@ -13,10 +13,18 @@ const express = require('express');
 const bodyParser = require("body-parser");
 var app = express();
 app.use(bodyParser.json());
-app.get('/status', async function (req, res) {
+
+var updatesToGraph  = [];
+var startIndex = 0;
+app.get('/updates', async function (req, res) {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-  res.status(200).json({url:"test"});
+  var lastIndex = updatesToGraph.length;
+
+  res.status(200).json(updatesToGraph.slice(startIndex, lastIndex));
+  startIndex = lastIndex;
+  console.log("New Start Index:", startIndex);
+
 });
 
 app.get('/', function(req, res) {
@@ -24,7 +32,52 @@ app.get('/', function(req, res) {
 });
 
 //CONSTANTS
-const SHOUD_ATTACK = true;
+const PROBABILITY_CREATE_GOOD = 0.75;
+const MAX_GOOD_AGENTS = 100;
+const PROBABILITY_RECIEVE_MESSAGE = 0.75;
+const PROBABILITY_CREATE_BAD = 0.75;
+const MAX_BAD_AGENTS = 100;
+const PROBABILITY_SEND_BLACKLISTABLE_MESSAGE = 0.01;
+
+var agents = [];
+var goodAgents = [];
+var badAgents = [];
+var edgeIDCount = 0;
+var edgeObject = {}; //from-to as ""|"" key...value is edgeID
+
+function findAgentID(agents, publicKey) {
+  var i;
+  for (i=0; i<agents.length; i++) {
+    if (agents[i].publicKey == publicKey) {
+      return i;
+    }
+  }
+}
+
+function createBlacklistAction(fromID, publicKey) {
+  var thisAgentID = findAgentID(agents, publicKey);
+  var edgeKey = fromID.toString() + "|" + thisAgentID.toString();
+  if (edgeKey in edgeObject) {
+    return ["modify edge", edgeObject[edgeKey], 1, true];
+  } else {
+    edgeObject[edgeKey] = edgeIDCount;
+    edgeIDCount += 1;
+    return ["create edge", edgeObject[edgeKey], fromID, thisAgentID, 1, true];
+  }
+}
+
+function createReputationAction(fromID, publicKey, width) {
+  console.log("CREATE REPUTATION ACTION!!");
+  var thisAgentID = findAgentID(agents, publicKey);
+  var edgeKey = fromID.toString() + "|" + thisAgentID.toString();
+  if (edgeKey in edgeObject) {
+    return ["modify edge", edgeObject[edgeKey], width, false];
+  } else {
+    edgeObject[edgeKey] = edgeIDCount;
+    edgeIDCount += 1;
+    return ["create edge", edgeObject[edgeKey], fromID, thisAgentID, width, false];
+  }
+}
 
 async function createAgent() {
   var agentInstance = new agent();
@@ -33,19 +86,7 @@ async function createAgent() {
 }
 
 async function performTest(IPFSNode) {
-
-  var agents = [];
-  const numAgents = 2;
-  var i;
-  for (i = 0; i < numAgents; i++) {
-    console.log("Agent:", i)
-    var thisAgent = await createAgent();
-    console.log(thisAgent.publicKey);
-    agents.push(thisAgent);
-  }
-
-  var chaosAgent = new chaos(await createAgent(), utils);
-
+  updatesToGraph.push(["clean"]); //deletes store
 
   //simulate 10 rounds
   //can choose to send (be honest or malicious) or not
@@ -53,34 +94,62 @@ async function performTest(IPFSNode) {
   var createdMessages = [];
   var y = 0;
   while (true) {
-    var i;
-    //send messages from honest agents
-    for (i = 0; i < agents.length; i++) {
-      var urlToSend = agents[i].getRandomURL();
-      var ratingToGive = agents[i].getRating();
-      if (urlToSend != null) {
-        console.log("Agent:", i, urlToSend, "Rating:", ratingToGive, "Risk Score:", agents[i].db.getURLRiskScore(urlToSend));
-        const {IPFSHash, messageContents} = await utils.createMessage(IPFSNode, urlToSend, ratingToGive, agents[i].lastMessageIPFS, agents[i].publicKey, agents[i].privateKey);
-        agents[i].lastMessageIPFS = IPFSHash;
-        const {shouldBlacklist, parsedMessage} = await utils.parseMessage(IPFSHash, messageContents); //should never be blacklist for self
-        agents[i].db.addMessage(parsedMessage);
-        createdMessages.push([IPFSHash, messageContents]); //broadcast
-
-
-
-        chaosAgent.observeMessage(messageContents);
-      }
+    //Consider Creating Good
+    if (Math.random() < PROBABILITY_CREATE_GOOD && goodAgents.length <= MAX_GOOD_AGENTS) {
+      var thisAgent = await createAgent();
+      agents.push(thisAgent);
+      goodAgents.push(agents.length - 1);
+      console.log("Good Agent Created:", agents.length - 1);
+      updatesToGraph.push(["create node", agents.length - 1, 'blue']);
     }
 
-    if (SHOUD_ATTACK) {
-      //send messages from malicious agent with valid signature
-      createdMessages.push(await chaosAgent.createValidMessage(IPFSNode));
-      if (Math.random() > 0.8) {
+    //Consider Creating Bad
+    if (Math.random() < PROBABILITY_CREATE_BAD && goodAgents.length > 0 && badAgents.length <= MAX_BAD_AGENTS) {
+      var chaosAgent = new chaos(await createAgent(), utils);
+      agents.push(chaosAgent);
+      badAgents.push(agents.length - 1);
+      console.log("Bad Agent Created:", agents.length - 1);
+      updatesToGraph.push(["create node", agents.length - 1, 'yellow']);
+    }
+
+    var thisRoundMessage = [];
+
+    var k;
+    //send messages from honest agents
+    for (k = 0; k < goodAgents.length; k++) {
+      var i = goodAgents[k];
+      var urlToSend = await agents[i].getRandomURL();
+      var ratingToGive = agents[i].getRating();
+      if (urlToSend.includes("www.suspicious.com")) {
+        updatesToGraph.push(["infected node", i]);
+        ratingToGive = 0; //set bad rating since honest (so other peers won't get)
+      }
+
+      console.log("Agent:", i, urlToSend, "Rating:", ratingToGive, "Risk Score:", agents[i].db.getURLRiskScore(urlToSend));
+      if(agents[i].db.checkIfAlreadyRated(agents[i].publicKey, utils.cleanURL(urlToSend))) {
+        console.log("Already rated:", urlToSend);
+        continue;
+      }
+      const {IPFSHash, messageContents} = await utils.createMessage(IPFSNode, urlToSend, ratingToGive, agents[i].lastMessageIPFS, agents[i].publicKey, agents[i].privateKey);
+      agents[i].lastMessageIPFS = IPFSHash;
+      const {shouldBlacklist, parsedMessage} = await utils.parseMessage(IPFSHash, messageContents); //should never be blacklist for self
+      agents[i].db.addMessage(parsedMessage);
+      createdMessages.push([IPFSHash, messageContents]); //broadcast
+      //send messages from bad agents
+      thisRoundMessage.push(messageContents);
+    }
+
+    var k;
+    //send messages from bad agents
+    for (k = 0; k < badAgents.length; k++) {
+      var i = badAgents[k];
+      for (messID in thisRoundMessage) {
+        agents[i].observeMessage(thisRoundMessage[messID]);
+      }
+      createdMessages.push(await agents[i].createValidMessage(IPFSNode));
+      if (Math.random() < PROBABILITY_SEND_BLACKLISTABLE_MESSAGE) { //MOSTLY BE SUSPICIOUS
+        updatesToGraph.push(["bad node", badAgents[badAgents.length-1]]);
         createdMessages.push(await chaosAgent.createRandomBadMessage(IPFSNode));
-
-        console.log("CREATING NEW MALICIOUS AGENT IDENTITY!");
-        var chaosAgent = new chaos(await createAgent(), utils);
-
       }
     }
 
@@ -88,9 +157,10 @@ async function performTest(IPFSNode) {
     var messagesToBroadcast = [];
     while(createdMessages.length > 0) {
       var thisMessage = createdMessages.pop();
-      var i;
-      for (i = 0; i < agents.length; i++) {
-        if (Math.random() > 0.5) {
+      var k;
+      for (k = 0; k < goodAgents.length; k++) {
+        var i = goodAgents[k];
+        if (Math.random() > PROBABILITY_RECIEVE_MESSAGE) {
           //check to see if already in history
           if (agents[i].db.checkMessageIPFS(thisMessage[0])) { //can avoid a lot of work
             console.log("ALREADY SEEN", thisMessage[0]);
@@ -102,6 +172,7 @@ async function performTest(IPFSNode) {
           var {shouldBlacklist, parsedMessage} = await utils.parseMessage(thisMessage[0], thisMessage[1]); //should never be blacklist for self
           if (shouldBlacklist) {
             agents[i].db.addBlacklistPeer(shouldBlacklist);
+            updatesToGraph.push(createBlacklistAction(i, shouldBlacklist));
             continue;
           }
 
@@ -113,6 +184,7 @@ async function performTest(IPFSNode) {
 
           if (shouldBlacklist) {
             agents[i].db.addBlacklistPeer(shouldBlacklist);
+            updatesToGraph.push(createBlacklistAction(i, shouldBlacklist));
             continue
           }
 
@@ -121,6 +193,7 @@ async function performTest(IPFSNode) {
 
           if (shouldBlacklist) {
             agents[i].db.addBlacklistPeer(shouldBlacklist);
+            updatesToGraph.push(createBlacklistAction(i, shouldBlacklist));
             continue
           }
 
@@ -134,21 +207,28 @@ async function performTest(IPFSNode) {
     createdMessages = messagesToBroadcast;
 
     console.log("***********");
-    var i;
-    for (i = 0; i < agents.length; i++) {
+    var k;
+    for (k = 0; k < goodAgents.length; k++) {
+      var i = goodAgents[k];
       //get getPeerReputations
       console.log("Agent:", i);
-      console.log("reputations:",agents[i].db.getPeerReputations());
+      var peerRepsTotal = agents[i].db.getPeerReputations();
+      var peerReps = peerRepsTotal.peerReputations;
+      var totalRep = peerRepsTotal.totalReputation;
+      console.log("reputations:", peerReps);
+      for (repKey in peerReps) {
+        updatesToGraph.push(createReputationAction(i, repKey, (peerReps[repKey]/totalRep) * 3));
+      }
       //get blacklisted peers
       console.log("blacklist:", agents[i].db.getAllBlacklistedPeers());
 
       //test backup
-      var backupFile = await agents[i].db.backupDB();
-      agents[i].db.restoreDB(backupFile);
-
-      console.log("reputations:",agents[i].db.getPeerReputations());
-      //get blacklisted peers
-      console.log("blacklist:", agents[i].db.getAllBlacklistedPeers());
+      // var backupFile = await agents[i].db.backupDB();
+      // agents[i].db.restoreDB(backupFile);
+      //
+      // console.log("reputations:",agents[i].db.getPeerReputations());
+      // //get blacklisted peers
+      // console.log("blacklist:", agents[i].db.getAllBlacklistedPeers());
 
       console.log("+++++++++++++++");
     }
@@ -178,5 +258,5 @@ const node = new IPFS({
 node.on('ready', async () => {
   app.listen(3001);
   console.log("API now listening on Port 3001");
-  // performTest(node);
+  performTest(node);
 });

@@ -22,72 +22,147 @@
 
 <script type="text/javascript">
 
-    function addNode() {
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function callUpdates() {
+      $.get( "http://localhost:3001/updates", async function( data ) {
+        var results = data;
+        if (results.length == 0) {
+          await sleep(1000);
+        }
+        // console.log("RESULTS RECIEVED!!:", results.length);
+        for (result in results) {
+          // await sleep(1000);
+          console.log(results[result]);
+          var action = results[result][0];
+          if (action == "create node") {
+            addNode(results[result][1], results[result][2]);
+          } else if (action == "bad node") {
+            setNodeColor(results[result][1], 'red');
+          } else if (action == "infected node") {
+            setNodeColor(results[result][1], 'green');
+          } else if (action == "modify edge") {
+            updateEdge(results[result][1], results[result][2], results[result][3]);
+          } else if (action == "create edge") {
+            addEdge(results[result][1], results[result][2], results[result][3], results[result][4], results[result][5]);
+          } else if (action == "clean") {
+            // create an array with nodes
+            nodes = new vis.DataSet([]);
+
+            // create an array with edges
+            edges = new vis.DataSet([]);
+
+            // create a network
+            container = document.getElementById('mynetwork');
+
+            // provide the data in the vis format
+            data = {
+                nodes: nodes,
+                edges: edges
+            };
+            options = {};
+
+            // initialize your network!
+            network = new vis.Network(container, data, options);
+          }
+        }
+        callUpdates();
+      })
+      .fail(async function() {
+        await sleep(1000);
+        callUpdates();
+      })
+
+    }
+
+    function addNode(nodeID, color) {
         try {
+          if (color != 'blue') {
             nodes.add({
-                id: 6,
-                label: 'Node 6'
+                id: nodeID,
+                label: nodeID.toString(),
+                color:color
             });
+          } else {
+            nodes.add({
+                id: nodeID,
+                label: nodeID.toString()
+            });
+          }
+
         }
         catch (err) {
-            alert(err);
+
         }
     }
 
-    function setColorNode() {
+    function setNodeColor(nodeID, col) {
         try {
-            nodes.update({
-                id: 6,
-                color: 'red'
-            });
+          nodes.update({
+              id: nodeID,
+              color:col
+          });
         }
         catch (err) {
-            alert(err);
+
         }
     }
 
-    function addEdge() {
+    function addEdge(edgeID, fromNode, toNode, width, malicious) {
         try {
+          if (malicious) {
+            console.log("EDGE MALICIOUS");
             edges.add({
-                id:6,
-                from: 5,
-                to: 6,
-                width:10
+                arrows:'to',
+                id:edgeID,
+                from: fromNode,
+                to: toNode,
+                width:width,
+                color:{color:'red'}
             });
+          } else {
+            edges.add({
+                arrows:'to',
+                id:edgeID,
+                from: fromNode,
+                to: toNode,
+                width:width
+            });
+          }
         }
         catch (err) {
-            alert(err);
+
         }
     }
 
-    function removeEdge() {
+    function updateEdge(edgeID, width, malicious) {
         try {
-            edges.remove({
-              id:6
+          if (malicious) {
+            edges.update({
+                id:edgeID,
+                width:1,
+                color:{color:'red'}
             });
+          } else {
+            edges.update({
+                id:edgeID,
+                width:width
+            });
+          }
         }
         catch (err) {
-            alert(err);
+
         }
     }
 
 
     // create an array with nodes
-    var nodes = new vis.DataSet([
-        {id: 1, label: 'Node 1'},
-        {id: 2, label: 'Node 2'},
-        {id: 3, label: 'Node 3'},
-        {id: 4, label: 'Node 4'},
-        {id: 5, label: 'Node 5'}
-    ]);
+    var nodes = new vis.DataSet([]);
 
     // create an array with edges
-    var edges = new vis.DataSet([
-        {from: 1, to: 3},
-        {from: 1, to: 2},
-        {from: 2, to: 4},
-        {from: 2, to: 5}
-    ]);
+    var edges = new vis.DataSet([]);
 
     // create a network
     var container = document.getElementById('mynetwork');
@@ -101,18 +176,11 @@
 
     // initialize your network!
     var network = new vis.Network(container, data, options);
-    window.setInterval(function(){
-      $.get( "http://localhost:3001/status", function( data ) {
-        console.log(data);
-      });
-    }, 500);
+
+    //CHANGE TO CALLING X seconds after recieved to ensure no overlaps
+    callUpdates();
 
 </script>
-
-<button id="node-add" onclick="addNode();">Add Node</button>
-<button id="node-add" onclick="addEdge();">Add Edge</button>
-<button id="node-add" onclick="setColorNode();">Change Color</button>
-<button id="node-add" onclick="removeEdge();">Remove Edge</button>
 
 
 </body>

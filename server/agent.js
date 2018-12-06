@@ -8,6 +8,7 @@ async function createKeys() {
   return {publicKey:publicKey, privateKey:privateKey};
 }
 
+const USEFUL_CONTENT_BROWSING = 0.7;
 function agent() {
   this.initialize = async function() {
     var {publicKey, privateKey} = await createKeys();
@@ -15,39 +16,18 @@ function agent() {
     this.privateKey = privateKey;
     this.db = new simpledb(this.publicKey);
     this.lastMessageIPFS = null;
-    this.urls = null;
-
-    let promise = new Promise((resolve, reject) => {
-      fs.readFile( __dirname + '/wiki.txt', function (err, data) {
-        if (err) {
-          throw err;
-        }
-        resolve(JSON.parse(data.toString()));
-      });
-    });
-
-    var urls = await promise; //stock with 150 random wiki articles
-    this.urls = urls;
-    shuffle(this.urls);
   }
 
-  this.getRandomURL = function() {
-    if (Math.floor((Math.random() * 10) + 1) < 5) {
-      return this.urls.pop();
+  this.getRandomURL = async function() {
+    if (Math.random() < USEFUL_CONTENT_BROWSING) {
+      //visit popular
+      return "http://www.useful.com/" + Math.floor(Math.random() * 100).toString();
     } else {
-      this.db.getCountUnseen();
-      var thisRec = this.db.getRecommendation([]);
-      if (thisRec) {
-        console.log("Recommendation:", thisRec.url, "Score:", thisRec.score);
-        return thisRec.url;
-      } else {
-        return null;
-      }
+      var thisRec = await this.db.getRecommendation([]);
+      console.log("Recommendation:", thisRec);
+      return thisRec;
     }
-  }
 
-  this.popUnseenURL = function() {
-    return this.urls.pop();
   }
 
   this.getRating = function() {

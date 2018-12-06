@@ -60,7 +60,7 @@ async function performTest(IPFSNode) {
   var createdMessages = [];
   var y = 0;
   while (y < 10) {
-    var urlToSend = thisAgent.popUnseenURL();
+    var urlToSend = await thisAgent.getRandomURL();
     var ratingToGive = thisAgent.getRating();
     if (urlToSend != null) {
       console.log("Agent:", urlToSend, "Rating:", ratingToGive, "Risk Score:", thisAgent.db.getURLRiskScore(urlToSend));

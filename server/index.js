@@ -256,7 +256,7 @@ app.get('/recommendation', async function (req, res) {
 
   console.log("ALL WAITING URLS:", waitingURLs);
 
-  res.status(200).json({url:localDB.getRecommendationExtra(waitingURLs)});
+  res.status(200).json({url:await localDB.getRecommendation(waitingURLs)});
 });
 
 

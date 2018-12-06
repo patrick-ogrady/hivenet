@@ -1,6 +1,8 @@
 const crypto2 = require('crypto2');
 const randomstring = require("randomstring");
 
+const USEFUL_CONTENT_BROWSING = 0.4;
+
 module.exports = function(agent, utils) {
   this.utils = utils; //needed to keep same proof set
   this.seenLastMessageIPFS = null;
@@ -8,6 +10,8 @@ module.exports = function(agent, utils) {
   this.personalURLs = null;
   this.seenMessagesToSend = null;
   this.agent = agent; //needed for signing messages
+  this.publicKey = agent.publicKey;
+  this.urlsSent = [];
 
   this.observeMessage = async function(message) {
     const processedMessageTop = JSON.parse(message);
@@ -82,8 +86,23 @@ module.exports = function(agent, utils) {
     return {IPFSHash: IPFSHash, messageContents:fullMessageToSend};
   }
 
+  this.createMaliciousURL = function() {
+    return "http://www.suspicious.com/" + randomstring.generate(10);
+  }
+
   this.createValidMessage = async function(IPFSNode) {
-    var thisURL = this.agent.popUnseenURL();
+    var thisURL = this.createMaliciousURL();
+    if (Math.random() < USEFUL_CONTENT_BROWSING) {
+      //visit popular
+      thisURL = "http://www.useful.com/" + Math.floor(Math.random() * 100).toString();
+
+      if(this.urlsSent.includes(thisURL)) {
+        console.log("BAD AGENT ALREADY SENT:", thisURL);
+        thisURL = this.createMaliciousURL();
+      }
+    }
+    this.urlsSent.push(thisURL);
+
     var {IPFSHash, messageContents} = await this.utils.createMessage(IPFSNode, thisURL, this.agent.getRating(), this.agent.lastMessageIPFS, this.agent.publicKey, this.agent.privateKey);
     this.personalURLs = thisURL;
     this.agent.lastMessageIPFS = IPFSHash;
@@ -91,31 +110,31 @@ module.exports = function(agent, utils) {
   }
 
   this.createBadNonceMessage = async function(IPFSNode) {
-    var {IPFSHash, messageContents} = await this.createBadMessage(IPFSNode, this.agent.popUnseenURL(), this.agent.getRating(), this.agent.lastMessageIPFS, "-1", null, null);
+    var {IPFSHash, messageContents} = await this.createBadMessage(IPFSNode, await this.agent.getRandomURL(), this.agent.getRating(), this.agent.lastMessageIPFS, "-1", null, null);
     this.agent.lastMessageIPFS = IPFSHash;
     return [IPFSHash, messageContents];
   }
 
   this.createBadRatingMessage = async function(IPFSNode) {
-    var {IPFSHash, messageContents} = await this.createBadMessage(IPFSNode, this.agent.popUnseenURL(), 10, this.agent.lastMessageIPFS, null, null, null);
+    var {IPFSHash, messageContents} = await this.createBadMessage(IPFSNode, await this.agent.getRandomURL(), 10, this.agent.lastMessageIPFS, null, null, null);
     this.agent.lastMessageIPFS = IPFSHash;
     return [IPFSHash, messageContents];
   }
 
   this.createBadProofMessage = async function(IPFSNode) {
-    var {IPFSHash, messageContents} = await this.createBadMessage(IPFSNode, this.agent.popUnseenURL(), this.agent.getRating(), this.agent.lastMessageIPFS, null, this.seenProofs, null);
+    var {IPFSHash, messageContents} = await this.createBadMessage(IPFSNode, await this.agent.getRandomURL(), this.agent.getRating(), this.agent.lastMessageIPFS, null, this.seenProofs, null);
     this.agent.lastMessageIPFS = IPFSHash;
     return [IPFSHash, messageContents];
   }
 
   this.createHistoryMutationMessage = async function(IPFSNode) {
-    var {IPFSHash, messageContents} = await this.createBadMessage(IPFSNode, this.agent.popUnseenURL(), this.agent.getRating(), null, null, null, null);
+    var {IPFSHash, messageContents} = await this.createBadMessage(IPFSNode, await this.agent.getRandomURL(), this.agent.getRating(), null, null, null, null);
     this.agent.lastMessageIPFS = IPFSHash;
     return [IPFSHash, messageContents];
   }
 
   this.createStealHistoryMessage = async function(IPFSNode) {
-    var {IPFSHash, messageContents} = await this.createBadMessage(IPFSNode, this.agent.popUnseenURL(), this.agent.getRating(), this.seenLastMessageIPFS, null, null, null);
+    var {IPFSHash, messageContents} = await this.createBadMessage(IPFSNode, await this.agent.getRandomURL(), this.agent.getRating(), this.seenLastMessageIPFS, null, null, null);
     this.agent.lastMessageIPFS = IPFSHash;
     return [IPFSHash, messageContents];
   }
@@ -127,7 +146,7 @@ module.exports = function(agent, utils) {
   }
 
   this.createCopyInteriorMessage = async function(IPFSNode) {
-    var {IPFSHash, messageContents} = await this.createBadMessage(IPFSNode, this.agent.popUnseenURL(), this.agent.getRating(), this.agent.lastMessageIPFS, null, null, this.seenMessagesToSend);
+    var {IPFSHash, messageContents} = await this.createBadMessage(IPFSNode, await this.agent.getRandomURL(), this.agent.getRating(), this.agent.lastMessageIPFS, null, null, this.seenMessagesToSend);
     this.agent.lastMessageIPFS = IPFSHash;
     return [IPFSHash, messageContents];
   }
@@ -136,19 +155,19 @@ module.exports = function(agent, utils) {
     const thisRandom = randomstring.generate(64);
     console.log("Randomly Generated String:", thisRandom);
     const unreachableIPFS = (await IPFSNode.files.add(Buffer.from(thisRandom), {onlyHash:true}))[0].hash;
-    var {IPFSHash, messageContents} = await this.createBadMessage(IPFSNode, this.agent.popUnseenURL(), this.agent.getRating(), unreachableIPFS, null, null, null);
+    var {IPFSHash, messageContents} = await this.createBadMessage(IPFSNode, await this.agent.getRandomURL(), this.agent.getRating(), unreachableIPFS, null, null, null);
     this.agent.lastMessageIPFS = IPFSHash;
     return [IPFSHash, messageContents];
   }
 
   this.createInvalidIPFSAddress = async function(IPFSNode) {
-    var {IPFSHash, messageContents} = await this.createBadMessage(IPFSNode, this.agent.popUnseenURL(), this.agent.getRating(), "ajsdkljaskldj", null, null, null);
+    var {IPFSHash, messageContents} = await this.createBadMessage(IPFSNode, await this.agent.getRandomURL(), this.agent.getRating(), "ajsdkljaskldj", null, null, null);
     this.agent.lastMessageIPFS = IPFSHash;
     return [IPFSHash, messageContents];
   }
 
   this.createRandomBadMessage = async function(IPFSNode) {
-    var typeAttack = Math.floor((Math.random() * 7));
+    var typeAttack = Math.floor((Math.random() * 8));
     if (typeAttack == 0) {
       return await this.createBadNonceMessage(IPFSNode);
     } else if (typeAttack == 1) {
@@ -159,13 +178,17 @@ module.exports = function(agent, utils) {
       return await this.createHistoryMutationMessage(IPFSNode);
     } else if (typeAttack == 4) {
       return await this.createStealHistoryMessage(IPFSNode);
-    } else if (typeAttack == 5) {
+    } else if (typeAttack == 5 && this.personalURLs) {
       return await this.createDuplicateRatingMessage(IPFSNode);
     } else if (typeAttack == 6) {
       return await this.createCopyInteriorMessage(IPFSNode);
     } else if (typeAttack == 7) {
       return await this.createInvalidIPFSAddress(IPFSNode);
+    } else {
+      return await this.createValidMessage(IPFSNode);
     }
   }
   //different attack modifications
+
+
 }
