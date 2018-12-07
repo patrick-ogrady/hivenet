@@ -24,6 +24,10 @@ environment that allows anyone to observe how parameter changes affect HIVENET
 performance. To simulate HIVENET with the standard parameters please run:
 `docker run -t -p 3000:3000 -p 4001:4001 -v `pwd`:/var/log/hivenet patrickogrady/hivenet:latest bash -c "npm test"`
 
+This command starts a Docker container to run the simulation and starts a
+web server that provides a GUI view of the simulation that is available at:
+`localhost:3000`.
+
 *An overview of simulation parameters and assumptions is provided in the
 technical specification.*
 
@@ -54,9 +58,16 @@ URL, but the probability this single useful rating affects recommendations goes
 down with the requirement to observe X other useful ratings before considering.
 ![alt text](https://github.com/uncompany/hivenet/raw/master/readmeAssets/image2.png)
 
+## Using HIVENET
+*This assumes that the Docker image provided earlier is already downloaded.*
+
+### Add Chrome Extension
+To interface with HIVENET, the user can use the API endpoint that the "agent"
+provides at port 3000 (*API reference provided in technical specification*) or
+use the provided Chrome Extension. To download the chrome extension, [click here](https://github.com/uncompany/hivenet/raw/master/readmeAssets/chrome-extension.zip?raw=true).
 
 
-# Install Agent (using docker)
+#
 create new directory to store all working files and IPFS (ex:hivenetruntime) and cd into
 docker run -t -p 3000:3000 -p 4001:4001 -v `pwd`:/var/log/hivenet patrickogrady/hivenet:latest bash -c "npm start"
 
