@@ -4,8 +4,8 @@ const hexToBinary = require('hex-to-binary');
 const bigInt = require("big-integer");
 const cryptr = require('cryptr');
 
-const PROD_DIFFICULTY = 15;
-const GOAL_HASH = 5000;
+const PROD_DIFFICULTY = 21;
+const GOAL_HASH = 5000; //used to limit how much CPU resources being used
 
 const IPFS_TIMEOUT = 10000; //10 seconds
 
