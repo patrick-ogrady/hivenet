@@ -22,7 +22,9 @@ be found here: https://docs.docker.com/install/
 To test the underlying algorithms in HIVENET, I created a simulation
 environment that allows anyone to observe how parameter changes affect HIVENET
 performance. To simulate HIVENET with the standard parameters please run:
-`docker run -t -p 3000:3000 -p 4001:4001 -v `` ` ``pwd`` ` ``:/var/log/hivenet patrickogrady/hivenet:latest bash -c "npm test"`
+```
+docker run -t -p 3000:3000 -p 4001:4001 -v `pwd`:/var/log/hivenet patrickogrady/hivenet:latest bash -c "npm test"
+```
 
 This command starts a Docker container to run the simulation and starts a
 web server that provides a GUI view of the simulation that is available at:
