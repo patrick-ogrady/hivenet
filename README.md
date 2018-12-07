@@ -24,11 +24,36 @@ environment that allows anyone to observe how parameter changes affect HIVENET
 performance. To simulate HIVENET with the standard parameters please run:
 `docker run -t -p 3000:3000 -p 4001:4001 -v `pwd`:/var/log/hivenet patrickogrady/hivenet:latest bash -c "npm test"`
 
-To run modified simulations, download this github repo and build a new docker
+*An overview of simulation parameters and assumptions is provided in the
+technical specification.*
+
+To run modified simulations, download this GitHub repo and build a new docker
 image after you've made changes.
-![alt text](https://github.com/uncompany/hivenet/raw/master/readmeAssets/image1.png) <!-- width=400 -->
-![alt text](https://github.com/uncompany/hivenet/raw/master/readmeAssets/image2.png)
+
+*A legend for the meanings of different colors in the following diagram is
+provided in the technical specification.*
+
+### Production Parameters
+This simulation required a user to have provided 5 units of reputation before
+considering any recommendations from peers. This sufficiently prevented the
+spread of suspicious URLs from malicious hosts (*viewing suspicious URL
+indicated by green node color*).
+![alt text](https://github.com/uncompany/hivenet/raw/master/readmeAssets/image1.png)
+### Randomly Trying Unrecommended URLs
+Inspired by the BitTorrent notion of randomly unchoking peers, this simulation
+explored the notion of randomly trying observed URLs when no recommendations
+were available (no URL was deemed safe). This approach led to significant spread
+of suspicious URL.
 ![alt text](https://github.com/uncompany/hivenet/raw/master/readmeAssets/image3.png)
+
+### Production Parameters (no minimum requirement on reputation units)
+This simulation explored the notion of not having a minimum observed reputation
+before considering peer reputation. This exposed some users to suspicious URLs
+because there is a chance that a malicious peer could discover a single useful
+URL, but the probability this single useful rating affects recommendations goes
+down with the requirement to observe X other useful ratings before considering.
+![alt text](https://github.com/uncompany/hivenet/raw/master/readmeAssets/image2.png)
+
 
 
 # Install Agent (using docker)
