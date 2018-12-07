@@ -307,4 +307,10 @@ figlet('HIVENET', function(err, data) {
 
     node.on('ready', initNet);
 
+    node.on('error', async () => {
+      console.log("**********ERROR*************")
+      console.log("NO INTERNET CONNECTION DETECTED!");
+      process.exit();
+    });
+
 });

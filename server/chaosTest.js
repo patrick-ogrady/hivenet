@@ -118,6 +118,10 @@ async function performTest(IPFSNode) {
   assert(await checkBlacklist(IPFSNode, thisAgent, await chaosAgent.createInvalidIPFSAddress(IPFSNode)));
   await thisAgent.db.restoreDB(backupString);
 
+  console.log("************TESTING SUCCESSFUL************");
+
+  process.exit();
+
 
 }
 
@@ -136,4 +140,9 @@ const node = new IPFS({
 
 node.on('ready', async () => {
   performTest(node);
+});
+
+node.on('error', async () => {
+  console.log("**********ERROR************")
+  console.log("NO INTERNET CONNECTION DETECTED!");
 });

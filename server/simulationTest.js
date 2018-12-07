@@ -260,3 +260,8 @@ node.on('ready', async () => {
   console.log("Simulation API now listening on Port 3000");
   performTest(node);
 });
+
+node.on('error', async () => {
+  console.log("**********ERROR*************")
+  console.log("NO INTERNET CONNECTION DETECTED!");
+});
