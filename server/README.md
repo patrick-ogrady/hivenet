@@ -5,3 +5,9 @@ docker run -t -p 3000:3000 -p 4001:4001 -v `pwd`:/var/log/hivenet patrickogrady/
 //pull docker pull patrickogrady/hivenet:latest
 
 # Add Chrome Extension
+
+
+# run simulation
+docker run -t -p 3000:3000 -p 4001:4001 -v `pwd`:/var/log/hivenet patrickogrady/hivenet:latest bash -c "node simulationTest.js"
+
+# run chaos test

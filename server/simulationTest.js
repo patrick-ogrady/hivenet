@@ -245,7 +245,7 @@ async function performTest(IPFSNode) {
 console.log("Loading IPFS Node....")
 const node = new IPFS({
   EXPERIMENTAL:{ pubsub: true},
-  relay:{enabled:true, hop:{enabled:true}},
+  // relay:{enabled:true, hop:{enabled:true}},
   config: {
     Addresses: {
       Swarm: [
@@ -256,7 +256,7 @@ const node = new IPFS({
 });
 
 node.on('ready', async () => {
-  app.listen(3001);
-  console.log("API now listening on Port 3001");
+  app.listen(3000);
+  console.log("Simulation API now listening on Port 3000");
   performTest(node);
 });

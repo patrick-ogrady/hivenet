@@ -124,7 +124,7 @@ async function performTest(IPFSNode) {
 console.log("Loading IPFS Node....")
 const node = new IPFS({
   EXPERIMENTAL:{ pubsub: true},
-  relay:{enabled:true, hop:{enabled:true}},
+  // relay:{enabled:true, hop:{enabled:true}},
   config: {
     Addresses: {
       Swarm: [
