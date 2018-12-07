@@ -5,8 +5,8 @@ var wget = require('node-wget');
 const jsrecommender = require("./jsrecommender");
 
 const MAX_RISK_TOLERANCE = 0.5;
-const RANDOM_TRY_PEER = 0.0;//0.25;
-const MINIMUM_REPUTATION_OBSERVED_BEFORE_RECOMMENDATIONS = 5;
+const RANDOM_TRY_URL = 0.0;//0.25;
+const MINIMUM_REPUTATION_ASSIGNED_BEFORE_RECOMMENDATIONS = 5;
 
 function simpledb(thisPublicKey) {
   this.publicKey = thisPublicKey;
@@ -243,7 +243,7 @@ function simpledb(thisPublicKey) {
         reputationFor += peerReputations[key];
       }
     }
-    if (totalReputation <= MINIMUM_REPUTATION_OBSERVED_BEFORE_RECOMMENDATIONS) { //ENSURE THAT HAVE OBSERVED ENOUGH PEERS FOR SUFFICIENT REPUTATION
+    if (totalReputation <= MINIMUM_REPUTATION_ASSIGNED_BEFORE_RECOMMENDATIONS) { //ENSURE THAT HAVE OBSERVED ENOUGH PEERS FOR SUFFICIENT REPUTATION
       return 1;
     }
 
@@ -324,7 +324,7 @@ function simpledb(thisPublicKey) {
       return resultSetData[0].url;
     } else {
       var unseenURLs = this.getCountUnseen();
-      if (unseenURLs.length > 0 && Math.random() < RANDOM_TRY_PEER) {
+      if (unseenURLs.length > 0 && Math.random() < RANDOM_TRY_URL) {
         return unseenURLs[Math.floor(Math.random() * unseenURLs.length)];
       } else {
         var randWiki = await this.getRandomURLFromWikipedia();
