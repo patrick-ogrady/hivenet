@@ -26,9 +26,9 @@ performance. To simulate HIVENET with the standard parameters please run:
 
 To run modified simulations, download this github repo and build a new docker
 image after you've made changes.
-![alt text](https://github.com/uncompany/hivenet/raw/master/readmeAssets/image1.png | width=400)
-![alt text](https://github.com/uncompany/hivenet/raw/master/readmeAssets/image2.png | width=400)
-![alt text](https://github.com/uncompany/hivenet/raw/master/readmeAssets/image3.png | width=400)
+![alt text](https://github.com/uncompany/hivenet/raw/master/readmeAssets/image1.png width=400)
+![alt text](https://github.com/uncompany/hivenet/raw/master/readmeAssets/image2.png width=400)
+![alt text](https://github.com/uncompany/hivenet/raw/master/readmeAssets/image3.png width=400)
 
 
 # Install Agent (using docker)
