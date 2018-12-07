@@ -19,9 +19,16 @@ specification). This image has been uploaded to the Docker Hub under the name
 be found here: https://docs.docker.com/install/
 
 ## Running Simulations
-![alt text](https://github.com/uncompany/hivenet/raw/master/readmeAssets/image1.png "Logo Title Text 1")
-![alt text](https://github.com/uncompany/hivenet/raw/master/readmeAssets/image2.png "Logo Title Text 2")
-![alt text](https://github.com/uncompany/hivenet/raw/master/readmeAssets/image3.png "Logo Title Text 3")
+To test the underlying algorithms in HIVENET, I created a simulation
+environment that allows anyone to observe how parameter changes affect HIVENET
+performance. To simulate HIVENET with the standard parameters please run:
+`docker run -t -p 3000:3000 -p 4001:4001 -v `pwd`:/var/log/hivenet patrickogrady/hivenet:latest bash -c "npm test"`
+
+To run modified simulations, download this github repo and build a new docker
+image after you've made changes.
+![alt text](https://github.com/uncompany/hivenet/raw/master/readmeAssets/image1.png | width=400)
+![alt text](https://github.com/uncompany/hivenet/raw/master/readmeAssets/image2.png | width=400)
+![alt text](https://github.com/uncompany/hivenet/raw/master/readmeAssets/image3.png | width=400)
 
 
 # Install Agent (using docker)
