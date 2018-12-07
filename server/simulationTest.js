@@ -264,4 +264,5 @@ node.on('ready', async () => {
 node.on('error', async () => {
   console.log("**********ERROR*************")
   console.log("NO INTERNET CONNECTION DETECTED!");
+  process.exit();
 });

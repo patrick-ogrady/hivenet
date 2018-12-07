@@ -2,9 +2,9 @@
   "name": "hivenet",
   "version": "0.0.1",
   "description": "an autonomous recommendation system",
-  "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node chaosTest.js && node simulationTest.js",
+    "start": "node index.js"
   },
   "author": "Patrick O'Grady <prohb125@gmail.com>",
   "license": "MIT",
@@ -12,7 +12,6 @@
     "big-integer": "^1.6.38",
     "body-parser": "^1.18.3",
     "chainpoint-client": "^0.2.4",
-    "configstore": "^4.0.0",
     "crypto2": "^2.0.0",
     "cryptr": "^4.0.0",
     "express": "^4.16.4",
@@ -27,8 +26,5 @@
     "random-key": "^0.3.2",
     "randomstring": "^1.1.5",
     "shuffle-array": "^1.0.1"
-  },
-  "bin": {
-    "hivenet": "./index.js"
   }
 }

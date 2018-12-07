@@ -23,5 +23,3 @@ EXPOSE 3000
 
 #EXPOSE IPFS SWARM
 EXPOSE 4001
-
-#CMD [ "node", "index.js" ]

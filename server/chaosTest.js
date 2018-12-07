@@ -118,7 +118,7 @@ async function performTest(IPFSNode) {
   assert(await checkBlacklist(IPFSNode, thisAgent, await chaosAgent.createInvalidIPFSAddress(IPFSNode)));
   await thisAgent.db.restoreDB(backupString);
 
-  console.log("************TESTING SUCCESSFUL************");
+  console.log("************CHAOS TESTING SUCCESSFUL************");
 
   process.exit();
 
