@@ -1,7 +1,8 @@
 const crypto2 = require('crypto2');
 const randomstring = require("randomstring");
 
-const USEFUL_CONTENT_BROWSING = 0.4;
+const USEFUL_CONTENT_BROWSING = 0.2;
+const USEFUL_ENTRIES = 50;
 
 module.exports = function(agent, utils) {
   this.utils = utils; //needed to keep same proof set
@@ -94,7 +95,7 @@ module.exports = function(agent, utils) {
     var thisURL = this.createMaliciousURL();
     if (Math.random() < USEFUL_CONTENT_BROWSING) {
       //visit popular
-      thisURL = "http://www.useful.com/" + Math.floor(Math.random() * 100).toString();
+      thisURL = "http://www.useful.com/" + Math.floor(Math.random() * USEFUL_ENTRIES).toString();
 
       if(this.urlsSent.includes(thisURL)) {
         console.log("BAD AGENT ALREADY SENT:", thisURL);

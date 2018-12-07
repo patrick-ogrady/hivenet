@@ -6,6 +6,7 @@ const jsrecommender = require("./jsrecommender");
 
 const MAX_RISK_TOLERANCE = 0.5;
 const RANDOM_TRY_PEER = 0.0;//0.25;
+const MINIMUM_REPUTATION_OBSERVED_BEFORE_RECOMMENDATIONS = 5;
 
 function simpledb(thisPublicKey) {
   this.publicKey = thisPublicKey;
@@ -242,7 +243,7 @@ function simpledb(thisPublicKey) {
         reputationFor += peerReputations[key];
       }
     }
-    if (totalReputation <= 5) { //ENSURE THAT HAVE OBSERVED ENOUGH PEERS FOR SUFFICIENT REPUTATION
+    if (totalReputation <= MINIMUM_REPUTATION_OBSERVED_BEFORE_RECOMMENDATIONS) { //ENSURE THAT HAVE OBSERVED ENOUGH PEERS FOR SUFFICIENT REPUTATION
       return 1;
     }
 
@@ -327,7 +328,7 @@ function simpledb(thisPublicKey) {
         return unseenURLs[Math.floor(Math.random() * unseenURLs.length)];
       } else {
         var randWiki = await this.getRandomURLFromWikipedia();
-        console.log("RANDOM WIKI ARTICLE");
+        console.log("RANDOM WIKI ARTICLE:", randWiki);
         return randWiki;
       }
     }

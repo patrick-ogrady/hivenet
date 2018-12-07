@@ -9,6 +9,7 @@ async function createKeys() {
 }
 
 const USEFUL_CONTENT_BROWSING = 0.7;
+const USEFUL_ENTRIES = 50;
 function agent() {
   this.initialize = async function() {
     var {publicKey, privateKey} = await createKeys();
@@ -21,7 +22,7 @@ function agent() {
   this.getRandomURL = async function() {
     if (Math.random() < USEFUL_CONTENT_BROWSING) {
       //visit popular
-      return "http://www.useful.com/" + Math.floor(Math.random() * 100).toString();
+      return "http://www.useful.com/" + Math.floor(Math.random() * USEFUL_ENTRIES).toString();
     } else {
       var thisRec = await this.db.getRecommendation([]);
       console.log("Recommendation:", thisRec);
