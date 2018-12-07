@@ -90,7 +90,7 @@ are deleted. So, the user must share a volume with the container where all
 stateful information is stored.*)
 
 After `cd` into this created folder, start the "agent" by running:
-`docker run -t -p 3000:3000 -p 4001:4001 -v `` `pwd` `` :/var/log/hivenet patrickogrady/hivenet:latest bash -c "npm start"`
+`docker run -t -p 3000:3000 -p 4001:4001 -v ```pwd``` :/var/log/hivenet patrickogrady/hivenet:latest bash -c "npm start"`
 
 Open the HIVENET Extension and give it a try!:
 ![alt text](https://github.com/uncompany/hivenet/raw/master/readmeAssets/image7.png)
