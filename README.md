@@ -64,19 +64,33 @@ down with the requirement to observe X other useful ratings before considering.
 ### Add Chrome Extension
 To interface with HIVENET, the user can use the API endpoint that the "agent"
 provides at port 3000 (*API reference provided in technical specification*) or
-use the provided Chrome Extension. To download the chrome extension, [click here](https://github.com/uncompany/hivenet/raw/master/readmeAssets/chrome-extension.zip?raw=true).
+use the provided Chrome Extension.
+
+To download the Chrome Extension, [click here](https://github.com/uncompany/hivenet/raw/master/readmeAssets/chrome-extension.zip?raw=true).
+
+Once downloaded, unpack the ZIP file into a new folder (*usually this just means
+clicking on the file on Mac*).
+
+Next, navigate to `chrome://extensions`. Toggle the `developer mode` tab in the
+top right of the screen:
+![alt text](https://github.com/uncompany/hivenet/raw/master/readmeAssets/image4.png)
+
+In the top lefthand corner of the screen click `Load unpacked`:
+![alt text](https://github.com/uncompany/hivenet/raw/master/readmeAssets/image5.png)
+
+Select the file you just unzipped:
+![alt text](https://github.com/uncompany/hivenet/raw/master/readmeAssets/image6.png)
 
 
-#
-create new directory to store all working files and IPFS (ex:hivenetruntime) and cd into
-docker run -t -p 3000:3000 -p 4001:4001 -v `pwd`:/var/log/hivenet patrickogrady/hivenet:latest bash -c "npm start"
 
-//pull docker pull patrickogrady/hivenet:latest
+### Start Agent
+Create a folder that will store all the config files used during execution.
+(*Docker is stateless so any files left in the container at the end of execution
+are deleted. So, the user must share a volume with the container where all
+stateful information is stored.*)
 
-# Add Chrome Extension
+After `cd` into this created folder, start the "agent" by running:
+`docker run -t -p 3000:3000 -p 4001:4001 -v `pwd`:/var/log/hivenet patrickogrady/hivenet:latest bash -c "npm start"`
 
-
-# run simulation
-docker run -t -p 3000:3000 -p 4001:4001 -v `pwd`:/var/log/hivenet patrickogrady/hivenet:latest bash -c "npm test"
-
-# run chaos test
+Open the HIVENET Extension and give it a try!:
+![alt text](https://github.com/uncompany/hivenet/raw/master/readmeAssets/image7.png)
