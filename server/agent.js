@@ -8,7 +8,7 @@ async function createKeys() {
   return {publicKey:publicKey, privateKey:privateKey};
 }
 
-const USEFUL_CONTENT_BROWSING = 0.7;
+const USEFUL_CONTENT_BROWSING_GOOD_AGENT = 0.7;
 const USEFUL_ENTRIES = 50;
 function agent() {
   this.initialize = async function() {
@@ -20,7 +20,7 @@ function agent() {
   }
 
   this.getRandomURL = async function() {
-    if (Math.random() < USEFUL_CONTENT_BROWSING) {
+    if (Math.random() < USEFUL_CONTENT_BROWSING_GOOD_AGENT) {
       //visit popular
       return "http://www.useful.com/" + Math.floor(Math.random() * USEFUL_ENTRIES).toString();
     } else {

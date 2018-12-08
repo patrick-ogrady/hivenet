@@ -1,7 +1,7 @@
 const crypto2 = require('crypto2');
 const randomstring = require("randomstring");
 
-const USEFUL_CONTENT_BROWSING = 0.2;
+const USEFUL_CONTENT_BROWSING_BAD_AGENT = 0.2;
 const USEFUL_ENTRIES = 50;
 
 module.exports = function(agent, utils) {
@@ -93,7 +93,7 @@ module.exports = function(agent, utils) {
 
   this.createValidMessage = async function(IPFSNode) {
     var thisURL = this.createMaliciousURL();
-    if (Math.random() < USEFUL_CONTENT_BROWSING) {
+    if (Math.random() < USEFUL_CONTENT_BROWSING_BAD_AGENT) {
       //visit popular
       thisURL = "http://www.useful.com/" + Math.floor(Math.random() * USEFUL_ENTRIES).toString();
 
