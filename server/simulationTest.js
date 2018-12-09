@@ -33,10 +33,8 @@ app.get('/', function(req, res) {
 
 //CONSTANTS
 const PROBABILITY_CREATE_GOOD = 0.75;
-const MAX_GOOD_AGENTS = 100;
 const PROBABILITY_RECIEVE_MESSAGE = 0.75;
 const PROBABILITY_CREATE_BAD = 0.75;
-const MAX_BAD_AGENTS = 100;
 const PROBABILITY_SEND_BLACKLISTABLE_MESSAGE = 0.01;
 const AGENT_SIMILARITY = 0.5;
 const MALICIOUS_AGENT_PREDICT_USEFUL = 0.5;
@@ -99,7 +97,7 @@ async function performTest(IPFSNode) {
   var y = 0;
   while (true) {
     //Consider Creating Good
-    if (Math.random() < PROBABILITY_CREATE_GOOD && goodAgents.length <= MAX_GOOD_AGENTS) {
+    if (Math.random() < PROBABILITY_CREATE_GOOD) {
       var thisAgent = await createAgent();
       agents.push(thisAgent);
       goodAgents.push(agents.length - 1);
@@ -109,7 +107,7 @@ async function performTest(IPFSNode) {
     }
 
     //Consider Creating Bad
-    if (Math.random() < PROBABILITY_CREATE_BAD && goodAgents.length > 0 && badAgents.length <= MAX_BAD_AGENTS) {
+    if (Math.random() < PROBABILITY_CREATE_BAD && goodAgents.length > 0) {
       var chaosAgent = new chaos(await createAgent(), utils, MALICIOUS_AGENT_PREDICT_USEFUL, MALICIOUS_AGENT_TIME_SPENT_GUESSING_USEFUL);
       agents.push(chaosAgent);
       badAgents.push(agents.length - 1);
