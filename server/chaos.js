@@ -1,9 +1,6 @@
 const crypto2 = require('crypto2');
 const randomstring = require("randomstring");
 
-const USEFUL_CONTENT_BROWSING_BAD_AGENT = 0.2;
-const USEFUL_ENTRIES = 50;
-
 module.exports = function(agent, utils, maliciousAgentPredictUseful, maliciousAgentTimeSpentGuessing) {
   this.utils = utils; //needed to keep same proof set
   this.seenLastMessageIPFS = null;
@@ -108,6 +105,10 @@ module.exports = function(agent, utils, maliciousAgentPredictUseful, maliciousAg
       if (Math.random() < this.maliciousAgentPredictUseful) { //first to predict useful
         //take highest seen and add 1 (ensure not already discovered)
         thisURL = "http://www.useful.com/" + (this.highestSeenUseful + 1).toString();
+
+        if (this.urlsSent.includes(thisURL)) {
+          thisURL = "http://www.useless.com/" + randomstring.generate(10);
+        }
       } else {
         thisURL = "http://www.useless.com/" + randomstring.generate(10);
       }
