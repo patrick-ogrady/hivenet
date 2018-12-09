@@ -2,31 +2,31 @@ const crypto2 = require('crypto2');
 const simpledb = require('./simpledb.js');
 var fs = require('fs');
 var shuffle = require('shuffle-array');
+const randomstring = require("randomstring");
 
 async function createKeys() {
   const { privateKey, publicKey } = await crypto2.createKeyPair();
   return {publicKey:publicKey, privateKey:privateKey};
 }
 
-const USEFUL_CONTENT_BROWSING_GOOD_AGENT = 0.7;
-const USEFUL_ENTRIES = 50;
-function agent() {
+function agent(agentSimilarity) {
   this.initialize = async function() {
     var {publicKey, privateKey} = await createKeys();
     this.publicKey = publicKey;
     this.privateKey = privateKey;
     this.db = new simpledb(this.publicKey);
     this.lastMessageIPFS = null;
+    this.currentUsefulCount = 0;
+    this.agentSimilarity = agentSimilarity;
   }
 
   this.getRandomURL = async function() {
-    if (Math.random() < USEFUL_CONTENT_BROWSING_GOOD_AGENT) {
+    if (Math.random() < this.agentSimilarity) {
       //visit popular
-      return "http://www.useful.com/" + Math.floor(Math.random() * USEFUL_ENTRIES).toString();
+      this.currentUsefulCount += 1
+      return "http://www.useful.com/" + (this.currentUsefulCount - 1).toString()
     } else {
-      var thisRec = await this.db.getRecommendation([]);
-      console.log("Recommendation:", thisRec);
-      return thisRec;
+      return "http://www.personal.com/" + randomstring.generate(10);
     }
 
   }

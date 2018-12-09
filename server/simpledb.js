@@ -5,7 +5,7 @@ var wget = require('node-wget');
 const jsrecommender = require("./jsrecommender");
 
 const MAX_RISK_TOLERANCE = 0.5;
-const RANDOM_TRY_URL = 0.0;//0.25;
+const RANDOM_TRY_URL = 0.0;
 const MINIMUM_REPUTATION_ASSIGNED_BEFORE_RECOMMENDATIONS = 5;
 
 function simpledb(thisPublicKey) {

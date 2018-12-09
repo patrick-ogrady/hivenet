@@ -6,7 +6,6 @@ const cryptr = require('cryptr');
 
 const PROD_DIFFICULTY = 21;
 const GOAL_HASH = 5000; //used to limit how much CPU resources being used
-
 const IPFS_TIMEOUT = 10000; //10 seconds
 
 module.exports = function(MODE){
@@ -395,7 +394,7 @@ module.exports = function(MODE){
   this.pullHistory =  async function(IPFSNode, thisDB, originalPublicKey, nextMessageIPFS) {
     if (nextMessageIPFS && nextMessageIPFS != "<none>") {
       var historyPull = nextMessageIPFS;
-      console.log("Should Historical Pull:", historyPull);
+      // console.log("Should Historical Pull:", historyPull);
       while (historyPull != null && historyPull != "<none>") {
         if (thisDB.checkMessageIPFS(historyPull) == false) {
           const {getContents, shouldBlacklistIPFS} = await this.getString(IPFSNode, historyPull);

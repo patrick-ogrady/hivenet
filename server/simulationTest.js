@@ -23,7 +23,7 @@ app.get('/updates', async function (req, res) {
 
   res.status(200).json(updatesToGraph.slice(startIndex, lastIndex));
   startIndex = lastIndex;
-  console.log("New Start Index:", startIndex);
+  // console.log("New Start Index:", startIndex);
 
 });
 
@@ -38,7 +38,11 @@ const PROBABILITY_RECIEVE_MESSAGE = 0.75;
 const PROBABILITY_CREATE_BAD = 0.75;
 const MAX_BAD_AGENTS = 100;
 const PROBABILITY_SEND_BLACKLISTABLE_MESSAGE = 0.01;
+const AGENT_SIMILARITY = 0.9;//0.1;
+const MALICIOUS_AGENT_PREDICT_USEFUL = 0.2;
+const MALICIOUS_AGENT_TIME_SPENT_GUESSING_USEFUL = 0.5;
 
+var publicKeyToAgent = {}
 var agents = [];
 var goodAgents = [];
 var badAgents = [];
@@ -67,7 +71,7 @@ function createBlacklistAction(fromID, publicKey) {
 }
 
 function createReputationAction(fromID, publicKey, width) {
-  console.log("CREATE REPUTATION ACTION!!");
+  // console.log("CREATE REPUTATION ACTION!!");
   var thisAgentID = findAgentID(agents, publicKey);
   var edgeKey = fromID.toString() + "|" + thisAgentID.toString();
   if (edgeKey in edgeObject) {
@@ -80,7 +84,7 @@ function createReputationAction(fromID, publicKey, width) {
 }
 
 async function createAgent() {
-  var agentInstance = new agent();
+  var agentInstance = new agent(AGENT_SIMILARITY);
   await agentInstance.initialize();
   return agentInstance;
 }
@@ -99,15 +103,17 @@ async function performTest(IPFSNode) {
       var thisAgent = await createAgent();
       agents.push(thisAgent);
       goodAgents.push(agents.length - 1);
+      publicKeyToAgent[thisAgent.publicKey] = agents.length - 1;
       console.log("Good Agent Created:", agents.length - 1);
       updatesToGraph.push(["create node", agents.length - 1, 'blue']);
     }
 
     //Consider Creating Bad
     if (Math.random() < PROBABILITY_CREATE_BAD && goodAgents.length > 0 && badAgents.length <= MAX_BAD_AGENTS) {
-      var chaosAgent = new chaos(await createAgent(), utils);
+      var chaosAgent = new chaos(await createAgent(), utils, MALICIOUS_AGENT_PREDICT_USEFUL, MALICIOUS_AGENT_TIME_SPENT_GUESSING_USEFUL);
       agents.push(chaosAgent);
       badAgents.push(agents.length - 1);
+      publicKeyToAgent[chaosAgent.agent.publicKey] = agents.length - 1;
       console.log("Bad Agent Created:", agents.length - 1);
       updatesToGraph.push(["create node", agents.length - 1, 'yellow']);
     }
@@ -146,11 +152,14 @@ async function performTest(IPFSNode) {
       for (messID in thisRoundMessage) {
         agents[i].observeMessage(thisRoundMessage[messID]);
       }
-      createdMessages.push(await agents[i].createValidMessage(IPFSNode));
+      var {toAppend, url} = await agents[i].createValidMessage(IPFSNode);
+      createdMessages.push(toAppend);
+      console.log("Bad Agent:", i, url);
       if (Math.random() < PROBABILITY_SEND_BLACKLISTABLE_MESSAGE) { //MOSTLY BE SUSPICIOUS
         updatesToGraph.push(["bad node", badAgents[badAgents.length-1]]);
         createdMessages.push(await chaosAgent.createRandomBadMessage(IPFSNode));
       }
+
     }
 
     //process messages (can choose to rebroadcast and add back to createdMessages)
@@ -163,7 +172,7 @@ async function performTest(IPFSNode) {
         if (Math.random() > PROBABILITY_RECIEVE_MESSAGE) {
           //check to see if already in history
           if (agents[i].db.checkMessageIPFS(thisMessage[0])) { //can avoid a lot of work
-            console.log("ALREADY SEEN", thisMessage[0]);
+            // console.log("ALREADY SEEN", thisMessage[0]);
             continue
           }
 
@@ -215,12 +224,21 @@ async function performTest(IPFSNode) {
       var peerRepsTotal = agents[i].db.getPeerReputations();
       var peerReps = peerRepsTotal.peerReputations;
       var totalRep = peerRepsTotal.totalReputation;
-      console.log("reputations:", peerReps);
+
+      var convertedReps = {};
       for (repKey in peerReps) {
+        convertedReps[publicKeyToAgent[repKey]] = peerReps[repKey]/totalRep;
         updatesToGraph.push(createReputationAction(i, repKey, (peerReps[repKey]/totalRep) * 3));
       }
+      console.log("reputations:", convertedReps);
+
       //get blacklisted peers
-      console.log("blacklist:", agents[i].db.getAllBlacklistedPeers());
+      var minimalBlacklist = [];
+      var blacklistData = agents[i].db.getAllBlacklistedPeers();
+      for (item in blacklistData) {
+        minimalBlacklist.push(publicKeyToAgent[blacklistData[item].publicKey]);
+      }
+      console.log("blacklist:", minimalBlacklist);
 
       //test backup
       // var backupFile = await agents[i].db.backupDB();
@@ -235,7 +253,6 @@ async function performTest(IPFSNode) {
 
     console.log("Messages Re-Broadcasted:", createdMessages.length);
     console.log("***********","ROUND COMPLETE", y, "***********");
-    console.log("\n\n");
     y += 1;
 
 

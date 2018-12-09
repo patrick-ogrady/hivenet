@@ -12,7 +12,7 @@ var assert = require('assert');
 
 
 async function createAgent() {
-  var agentInstance = new agent();
+  var agentInstance = new agent(1);
   await agentInstance.initialize();
   return agentInstance;
 }
@@ -77,7 +77,9 @@ async function performTest(IPFSNode) {
     y += 1;
   }
 
-  await checkBlacklist(IPFSNode, thisAgent, await chaosAgent.createValidMessage(IPFSNode));
+  var {toAppend, url} = await chaosAgent.createValidMessage(IPFSNode);
+
+  await checkBlacklist(IPFSNode, thisAgent, toAppend);
 
   const backupString = await thisAgent.db.backupDB()
 

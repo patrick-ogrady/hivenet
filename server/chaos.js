@@ -4,7 +4,7 @@ const randomstring = require("randomstring");
 const USEFUL_CONTENT_BROWSING_BAD_AGENT = 0.2;
 const USEFUL_ENTRIES = 50;
 
-module.exports = function(agent, utils) {
+module.exports = function(agent, utils, maliciousAgentPredictUseful, maliciousAgentTimeSpentGuessing) {
   this.utils = utils; //needed to keep same proof set
   this.seenLastMessageIPFS = null;
   this.seenProofs = null;
@@ -13,6 +13,9 @@ module.exports = function(agent, utils) {
   this.agent = agent; //needed for signing messages
   this.publicKey = agent.publicKey;
   this.urlsSent = [];
+  this.maliciousAgentPredictUseful = maliciousAgentPredictUseful;
+  this.maliciousAgentTimeSpentGuessing = maliciousAgentTimeSpentGuessing;
+  this.highestSeenUseful = null;
 
   this.observeMessage = async function(message) {
     const processedMessageTop = JSON.parse(message);
@@ -22,6 +25,14 @@ module.exports = function(agent, utils) {
     const parsedPayload = JSON.parse(processedMessage["message"]["payload"]);
     if ("lastMessageIPFS" in parsedPayload) {
       this.seenLastMessageIPFS = parsedPayload["lastMessageIPFS"];
+    }
+
+    if (parsedPayload["url"].includes("useful.com")) {
+      var usefulIndex = parseInt(parsedPayload["url"].split("useful.com/")[1]);
+      if (!this.highestSeenUseful || usefulIndex > this.highestSeenUseful) {
+        this.highestSeenUseful = usefulIndex;
+        // console.log("New highest seen useful!!:", this.highestSeenUseful);
+      }
     }
   }
 
@@ -92,22 +103,24 @@ module.exports = function(agent, utils) {
   }
 
   this.createValidMessage = async function(IPFSNode) {
-    var thisURL = this.createMaliciousURL();
-    if (Math.random() < USEFUL_CONTENT_BROWSING_BAD_AGENT) {
-      //visit popular
-      thisURL = "http://www.useful.com/" + Math.floor(Math.random() * USEFUL_ENTRIES).toString();
-
-      if(this.urlsSent.includes(thisURL)) {
-        console.log("BAD AGENT ALREADY SENT:", thisURL);
-        thisURL = this.createMaliciousURL();
+    var thisURL = null;
+    if (Math.random() < this.maliciousAgentTimeSpentGuessing) {
+      if (Math.random() < this.maliciousAgentPredictUseful) { //first to predict useful
+        //take highest seen and add 1 (ensure not already discovered)
+        thisURL = "http://www.useful.com/" + (this.highestSeenUseful + 1).toString();
+      } else {
+        thisURL = "http://www.useless.com/" + randomstring.generate(10);
       }
+    } else {
+      thisURL = this.createMaliciousURL();
     }
+
     this.urlsSent.push(thisURL);
 
     var {IPFSHash, messageContents} = await this.utils.createMessage(IPFSNode, thisURL, this.agent.getRating(), this.agent.lastMessageIPFS, this.agent.publicKey, this.agent.privateKey);
     this.personalURLs = thisURL;
     this.agent.lastMessageIPFS = IPFSHash;
-    return [IPFSHash, messageContents];
+    return {toAppend:[IPFSHash, messageContents], url:thisURL};
   }
 
   this.createBadNonceMessage = async function(IPFSNode) {
