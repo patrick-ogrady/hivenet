@@ -1,4 +1,4 @@
-# HIVENET: Autonomous and Decentralized URL Recommender System
+# HIVENET: Autonomous and Decentralized URL Recommender System Based on Useful Originality
 [Technical Specification](https://docs.google.com/document/d/1Rb9EufvXj5hVDkPmee73e2DkbNGvEg_BdoDfY8KuoxA/edit?usp=sharing)
 
 ## Introduction
