@@ -26,7 +26,7 @@ function agent(agentSimilarity) {
       this.currentUsefulCount += 1
       return "http://www.useful.com/" + (this.currentUsefulCount - 1).toString()
     } else {
-      return "http://www.personal.com/" + randomstring.generate(10);
+      return await this.db.getRecommendation();
     }
 
   }
