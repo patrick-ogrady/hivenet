@@ -1,5 +1,5 @@
 # HIVENET: Autonomous and Decentralized URL Recommender System Based on Useful Originality
-[Technical Specification](https://docs.google.com/document/d/1Rb9EufvXj5hVDkPmee73e2DkbNGvEg_BdoDfY8KuoxA/edit?usp=sharing)
+[Technical Specification](https://hackmd.io/@patrickogrady/hivenet)
 
 ## Introduction
 I built HIVENET to fulfill the "Senior Project Requirement" at Stanford
@@ -82,7 +82,6 @@ In the top lefthand corner of the screen click `Load unpacked`:
 
 Select the file you just unzipped:
 ![alt text](https://github.com/uncompany/hivenet/raw/master/readmeAssets/image6.png)
-
 
 
 ### Start Agent
